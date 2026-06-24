@@ -89,14 +89,14 @@ public class WorkflowRepository {
         return jdbcTemplate.update(sql, newStatus.name(), taskId, currentVersion);
     }
 
-    public int assignDeveloper(Long taskId, Long developerId, int currentVersion) {
-        String sql = """
-            UPDATE Eren_workflows
-            SET developer_id = ?, version = version + 1, updated_at = SYSTIMESTAMP
-            WHERE task_id = ? AND version = ? AND developer_id IS NULL
-            """;
-        return jdbcTemplate.update(sql, developerId, taskId, currentVersion);
-    }
+  public int assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
+    String sql = """
+        UPDATE Eren_workflows
+        SET developer_id = ?, version = version + 1, updated_at = SYSTIMESTAMP
+        WHERE task_id = ? AND version = ?
+        """;
+    return jdbcTemplate.update(sql, developerId, taskId, currentVersion);
+}
 
     public List<Workflow> findDoneByDeveloperId(Long developerId) {
     String sql = """
@@ -105,5 +105,18 @@ public class WorkflowRepository {
         ORDER BY updated_at DESC
         """;
     return jdbcTemplate.query(sql, rowMapper, developerId);
+}
+public List<Workflow> findAllActive() {
+    String sql = """
+        SELECT * FROM Eren_workflows
+        WHERE workflow_status != 'DONE'
+        ORDER BY created_at ASC
+        """;
+    return jdbcTemplate.query(sql, rowMapper);
+}
+
+public List<Workflow> findAll() {
+    String sql = "SELECT * FROM Eren_workflows ORDER BY created_at DESC";
+    return jdbcTemplate.query(sql, rowMapper);
 }
 }

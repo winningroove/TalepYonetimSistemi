@@ -4,5 +4,6 @@ public enum Role {
     CUSTOMER,
     PRODUCT_OWNER,
     DEVELOPER,
-    ADMIN
+    ADMIN,
+    SCRUM_MASTER
 }

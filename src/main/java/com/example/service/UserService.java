@@ -69,4 +69,8 @@ public class UserService {
 
         return user.getMusteriDegeri().getPuan();
     }
+
+    public List<User> findAll() {
+    return userRepository.findAll();
+}
 }

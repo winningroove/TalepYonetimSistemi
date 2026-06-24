@@ -37,6 +37,12 @@ public class DataInitializer implements ApplicationRunner {
         admin.setEmail("admin@firma.com");
         admin.setRole(Role.ADMIN);
         userService.createUser(admin, "Admin1234!");
+        
+        User sm = new User();
+        sm.setNameSurname("Ali Demir");
+        sm.setEmail("ali.demir@firma.com");
+        sm.setRole(Role.SCRUM_MASTER);
+        userService.createUser(sm, "Sm1234!");
 
         User po = new User();
         po.setNameSurname("Ayşe Kaya");

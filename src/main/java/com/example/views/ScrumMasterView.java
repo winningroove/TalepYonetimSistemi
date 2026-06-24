@@ -1,13 +1,15 @@
 package com.example.views;
 
+import com.example.enums.Role;
 import com.example.enums.WorkflowStatus;
-import com.example.model.Request;
+import com.example.model.User;
 import com.example.model.Workflow;
 import com.example.service.RequestService;
 import com.example.service.UserService;
 import com.example.service.WorkflowService;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
@@ -20,39 +22,34 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
-@Route("developer")
-@PageTitle("Geliştirici Paneli")
-@RolesAllowed("ROLE_DEVELOPER")
-public class DeveloperView extends HorizontalLayout {
+@Route("scrum-master")
+@PageTitle("Scrum Master Paneli")
+@RolesAllowed("ROLE_SCRUM_MASTER")
+public class ScrumMasterView extends HorizontalLayout {
 
     private final WorkflowService workflowService;
     private final RequestService requestService;
     private final UserService userService;
 
-    private Long currentUserId;
     private String currentUserName;
-
     private final VerticalLayout mainContent = new VerticalLayout();
 
-    public DeveloperView(WorkflowService workflowService,
-                         RequestService requestService,
-                         UserService userService) {
+    public ScrumMasterView(WorkflowService workflowService,
+                           RequestService requestService,
+                           UserService userService) {
         this.workflowService = workflowService;
         this.requestService = requestService;
         this.userService = userService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        userService.findByEmail(email).ifPresent(u -> {
-            currentUserId = u.getUserId();
-            currentUserName = u.getNameSurname();
-        });
+        userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
 
         setSizeFull();
         setPadding(false);
         setSpacing(false);
 
         add(buildSidebar(), buildMainContent());
-        showGorevlerim();
+        showSprintBoard();
     }
 
     private VerticalLayout buildSidebar() {
@@ -69,7 +66,7 @@ public class DeveloperView extends HorizontalLayout {
         H3 baslik = new H3("Talep Yönetim Sistemi");
         baslik.getStyle().set("color", "white").set("margin-top", "0");
 
-        Span altBaslik = new Span("Geliştirici Paneli");
+        Span altBaslik = new Span("Scrum Master Paneli");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
         H5 menuBaslik = new H5("Menü");
@@ -78,12 +75,12 @@ public class DeveloperView extends HorizontalLayout {
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button gorevlerimBtn   = menuButton("• Görevlerim");
-        Button havuzBtn        = menuButton("• Atanmamış Görev Havuzu");
-        Button tamamlananBtn   = menuButton("• Tamamlanan Görevler");
+        Button sprintBtn      = menuButton("• Sprint Board");
+        Button atanmamisBtn   = menuButton("• Atanmamış Görevler");
+        Button tamamlananBtn  = menuButton("• Tamamlanan Görevler");
 
-        gorevlerimBtn.addClickListener(e -> showGorevlerim());
-        havuzBtn.addClickListener(e -> showHavuz());
+        sprintBtn.addClickListener(e -> showSprintBoard());
+        atanmamisBtn.addClickListener(e -> showAtanmamisGorevler());
         tamamlananBtn.addClickListener(e -> showTamamlananlar());
 
         Div divider = new Div();
@@ -96,10 +93,10 @@ public class DeveloperView extends HorizontalLayout {
         Span girisYapan = new Span("Giriş Yapan:");
         girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
 
-        Span kullaniciAdi = new Span(currentUserName + " (Geliştirici)");
+        Span kullaniciAdi = new Span(currentUserName + " (Scrum Master)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
-        sidebar.add(baslik, altBaslik, menuBaslik, gorevlerimBtn, havuzBtn, tamamlananBtn);
+        sidebar.add(baslik, altBaslik, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, girisYapan, kullaniciAdi);
 
@@ -125,48 +122,47 @@ public class DeveloperView extends HorizontalLayout {
         return mainContent;
     }
 
-    // ── Görevlerim ──
-    private void showGorevlerim() {
+    // ── Sprint Board ──
+    private void showSprintBoard() {
         mainContent.removeAll();
 
-        H2 baslik = new H2("Görevlerim");
-        Paragraph aciklama = new Paragraph("Size atanan aktif görevler. Durumu güncelleyerek ilerlemeyi takip edin.");
+        H2 baslik = new H2("Sprint Board");
+        Paragraph aciklama = new Paragraph(
+            "Tüm aktif görevler ve durumları. Geliştiricilere görev atayabilirsiniz.");
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
         grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
-        grid.addComponentColumn(this::durumGuncelleButonu).setHeader("İşlem");
+        grid.addComponentColumn(w -> {
+            Button ataBtn = new Button(
+                w.getDeveloperId() == null ? "Geliştirici Ata" : "Yeniden Ata",
+                e -> atamaDiyaloguAc(w)
+            );
+            ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            return ataBtn;
+        }).setHeader("İşlem");
         grid.setWidthFull();
-
-        if (currentUserId != null) {
-            grid.setItems(workflowService.getDeveloperWorkflows(currentUserId));
-        }
+        grid.setItems(workflowService.getAllActiveWorkflows());
 
         mainContent.add(baslik, aciklama, grid);
     }
 
-    // ── Atanmamış Görev Havuzu ──
-    private void showHavuz() {
+    // ── Atanmamış Görevler ──
+    private void showAtanmamisGorevler() {
         mainContent.removeAll();
 
-        H2 baslik = new H2("Atanmamış Görev Havuzu");
-        Paragraph aciklama = new Paragraph("Henüz bir geliştiriciye atanmamış görevler. Üstlenmek için butona tıklayın.");
+        H2 baslik = new H2("Atanmamış Görevler");
+        Paragraph aciklama = new Paragraph(
+            "Henüz bir geliştiriciye atanmamış görevler.");
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
         grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
-            Button btn = new Button("Görevi Üstlen", e -> {
-                try {
-                    workflowService.assignDeveloper(w.getTaskId(), currentUserId, w.getVersion());
-                    Notification.show("Görev üstlenildi.", 3000, Notification.Position.TOP_CENTER);
-                    showHavuz();
-                } catch (Exception ex) {
-                    Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-                }
-            });
-            btn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-            return btn;
+            Button ataBtn = new Button("Geliştirici Ata", e -> atamaDiyaloguAc(w));
+            ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            return ataBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();
         grid.setItems(workflowService.getUnassignedWorkflows());
@@ -179,63 +175,85 @@ public class DeveloperView extends HorizontalLayout {
         mainContent.removeAll();
 
         H2 baslik = new H2("Tamamlanan Görevler");
-        Paragraph aciklama = new Paragraph("Tamamladığınız görevlerin listesi.");
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
+        grid.addColumn(w -> w.getUpdatedAt().toLocalDate()).setHeader("Tamamlanma Tarihi");
         grid.addComponentColumn(w -> {
             Span done = new Span("✓ Tamamlandı");
             done.getStyle().set("color", "green").set("font-weight", "bold");
             return done;
         }).setHeader("Durum");
-        grid.addColumn(w -> w.getUpdatedAt().toLocalDate()).setHeader("Tamamlanma Tarihi");
         grid.setWidthFull();
 
-        if (currentUserId != null) {
-            grid.setItems(workflowService.getDoneWorkflowsByDeveloper(currentUserId));
-        }
+        List<Workflow> tumGorevler = workflowService.getAllWorkflows();
+        List<Workflow> tamamlananlar = tumGorevler.stream()
+            .filter(w -> w.getWorkflowStatus() == WorkflowStatus.DONE)
+            .toList();
+        grid.setItems(tamamlananlar);
 
-        mainContent.add(baslik, aciklama, grid);
+        mainContent.add(baslik, grid);
     }
 
-    private Button durumGuncelleButonu(Workflow workflow) {
-        WorkflowStatus current = workflow.getWorkflowStatus();
+    // ── Geliştirici Atama Dialogu ──
+    private void atamaDiyaloguAc(Workflow workflow) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Geliştirici Ata — " + talepBasligi(workflow.getRequestId()));
 
-        WorkflowStatus next = switch (current) {
-            case BACKLOG     -> WorkflowStatus.IN_PROGRESS;
-            case IN_PROGRESS -> WorkflowStatus.TESTING;
-            case TESTING     -> WorkflowStatus.DONE;
-            default          -> null;
-        };
+        List<User> developerlar = userService.findAllActive().stream()
+            .filter(u -> u.getRole() == Role.DEVELOPER)
+            .toList();
 
-        if (next == null) {
-            Span done = new Span("✓ Tamamlandı");
-            done.getStyle().set("color", "green").set("font-weight", "bold");
-            return new Button("Tamamlandı");
+        ComboBox<User> developerBox = new ComboBox<>("Geliştirici Seç");
+        developerBox.setItems(developerlar);
+        developerBox.setItemLabelGenerator(User::getNameSurname);
+        developerBox.setWidthFull();
+
+        if (workflow.getDeveloperId() != null) {
+            developerlar.stream()
+                .filter(u -> u.getUserId().equals(workflow.getDeveloperId()))
+                .findFirst()
+                .ifPresent(developerBox::setValue);
         }
 
-        String butonText = switch (next) {
-            case IN_PROGRESS -> "Başla";
-            case TESTING     -> "Teste Gönder";
-            case DONE        -> "Tamamla";
-            default          -> "";
-        };
-
-        Button btn = new Button(butonText, e -> {
+        Button ataBtn = new Button("Ata", e -> {
+            if (developerBox.getValue() == null) {
+                Notification.show("Geliştirici seçiniz.", 3000, Notification.Position.MIDDLE);
+                return;
+            }
             try {
-                workflowService.updateStatus(workflow.getTaskId(), next, workflow.getVersion());
-                showGorevlerim();
+                workflowService.assignDeveloperBySM(
+                    workflow.getTaskId(),
+                    developerBox.getValue().getUserId(),
+                    workflow.getVersion()
+                );
+                Notification.show("Geliştirici atandı.", 3000, Notification.Position.TOP_CENTER);
+                dialog.close();
+                showSprintBoard();
             } catch (Exception ex) {
                 Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
             }
         });
-        btn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-        return btn;
+        ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+        Button iptalBtn = new Button("İptal", e -> dialog.close());
+
+        dialog.add(new VerticalLayout(developerBox));
+        dialog.getFooter().add(iptalBtn, ataBtn);
+        dialog.open();
     }
 
     private String talepBasligi(Long requestId) {
         return requestService.findById(requestId)
-            .map(Request::getTitle)
+            .map(r -> r.getTitle())
+            .orElse("Bilinmiyor");
+    }
+
+    private String developerAdi(Long developerId) {
+        if (developerId == null) return "Atanmadı";
+        return userService.findById(developerId)
+            .map(User::getNameSurname)
             .orElse("Bilinmiyor");
     }
 

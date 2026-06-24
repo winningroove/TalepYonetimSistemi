@@ -43,7 +43,7 @@ public class WorkflowService {
     }
 
     public void assignDeveloper(Long taskId, Long developerId, int currentVersion) {
-        int updated = workflowRepository.assignDeveloper(taskId, developerId, currentVersion);
+        int updated = workflowRepository.assignDeveloperBySM(taskId, developerId, currentVersion);
         if (updated == 0) {
             throw new IllegalStateException("Bu görev başkası tarafından üstlenildi. Sayfayı yenileyin.");
         }
@@ -65,4 +65,19 @@ public void updateStatus(Long taskId, WorkflowStatus newStatus, int currentVersi
     if (updated == 0) {
         throw new IllegalStateException("Görev başkası tarafından güncellendi. Sayfayı yenileyin.");
     }
-}}
+}
+public List<Workflow> getAllActiveWorkflows() {
+    return workflowRepository.findAllActive();
+}
+
+public List<Workflow> getAllWorkflows() {
+    return workflowRepository.findAll();
+}
+
+public void assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
+    int updated = workflowRepository.assignDeveloperBySM(taskId, developerId, currentVersion);
+    if (updated == 0) {
+        throw new IllegalStateException("Görev zaten atanmış veya başkası güncelledi.");
+    }
+}
+}

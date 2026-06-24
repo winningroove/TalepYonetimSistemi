@@ -24,11 +24,12 @@ public class RootView extends VerticalLayout implements BeforeEnterObserver {
 
         String role = auth.getAuthorities().iterator().next().getAuthority();
         switch (role) {
-            case "ROLE_CUSTOMER"      -> event.forwardTo("customer");
-            case "ROLE_PRODUCT_OWNER" -> event.forwardTo("po");
-            case "ROLE_DEVELOPER"     -> event.forwardTo("developer");
-            case "ROLE_ADMIN"         -> event.forwardTo("admin");
-            default                   -> event.forwardTo(LoginView.class);
-        }
+             case "ROLE_CUSTOMER"       -> event.forwardTo("customer");
+             case "ROLE_PRODUCT_OWNER"  -> event.forwardTo("po");
+             case "ROLE_DEVELOPER"      -> event.forwardTo("developer");
+             case "ROLE_ADMIN"          -> event.forwardTo("admin");
+             case "ROLE_SCRUM_MASTER"   -> event.forwardTo("scrum-master");
+             default                    -> event.forwardTo(LoginView.class);
+}
     }
 }
