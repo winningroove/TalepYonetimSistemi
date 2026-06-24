@@ -56,6 +56,36 @@
             <artifactId>browserless-test-junit6</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Oracle JDBC -->
+<dependency>
+    <groupId>com.oracle.database.jdbc</groupId>
+    <artifactId>ojdbc11</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- JdbcTemplate -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+
+<!-- Spring Security -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+
+<!-- Lombok -->
+<dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <optional>true</optional>
+</dependency>
+<dependency>
+    <groupId>com.oracle.database.nls</groupId>
+    <artifactId>orai18n</artifactId>
+    <version>23.9.0.25.07</version>
+</dependency>
     </dependencies>
     
     <build>
