@@ -19,6 +19,7 @@ import jakarta.annotation.security.RolesAllowed;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.List;
 
 @Route("po")
 @PageTitle("Ürün Sorumlusu Paneli")
@@ -29,6 +30,8 @@ public class POView extends HorizontalLayout {
     private final PrioritizationService prioritizationService;
     private final WorkflowService workflowService;
     private final UserService userService;
+    private final RequestFileService requestFileService;
+
     private String currentUserName;
 
     private final VerticalLayout mainContent = new VerticalLayout();
@@ -37,11 +40,12 @@ public class POView extends HorizontalLayout {
     public POView(RequestService requestService,
                   PrioritizationService prioritizationService,
                   WorkflowService workflowService,
-                  UserService userService) {
+                  UserService userService, RequestFileService requestFileService) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
         this.userService = userService;
+        this.requestFileService = requestFileService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
@@ -72,11 +76,14 @@ public class POView extends HorizontalLayout {
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
         H5 menuBaslik = new H5("Menü");
-        menuBaslik.getStyle().set("color", "#aaaaaa").set("margin-bottom", "8px").set("margin-top", "24px");
+        menuBaslik.getStyle()
+            .set("color", "#aaaaaa")
+            .set("margin-bottom", "8px")
+            .set("margin-top", "24px");
 
-        Button gelenTaleplerBtn  = menuButton("• Gelen Talepler");
-        Button oncelikHavuzuBtn  = menuButton("• Önceliklendirme Havuzu");
-        Button isAkislariBtn     = menuButton("• İş Akışları (Sprint)");
+        Button gelenTaleplerBtn = menuButton("• Gelen Talepler");
+        Button oncelikHavuzuBtn = menuButton("• Önceliklendirme Havuzu");
+        Button isAkislariBtn    = menuButton("• İş Akışları (Sprint)");
 
         gelenTaleplerBtn.addClickListener(e -> showGelenTalepler());
         oncelikHavuzuBtn.addClickListener(e -> showOnceliklendirmeHavuzu());
@@ -98,7 +105,7 @@ public class POView extends HorizontalLayout {
         sidebar.add(baslik, altBaslik, menuBaslik,
             gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi);
+        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
         return sidebar;
     }
@@ -116,18 +123,30 @@ public class POView extends HorizontalLayout {
         return btn;
     }
 
+    private Button buildLogoutButton() {
+        Button logoutBtn = new Button("Çıkış Yap",
+            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
+        logoutBtn.getStyle()
+            .set("background-color", "#c0392b")
+            .set("color", "white")
+            .set("width", "100%")
+            .set("margin-top", "12px")
+            .set("cursor", "pointer");
+        return logoutBtn;
+    }
+
     private VerticalLayout buildMainContent() {
         mainContent.setSizeFull();
         mainContent.setPadding(true);
         return mainContent;
     }
 
-    // ── Gelen Talepler (NEW statüsündekiler) ──
     private void showGelenTalepler() {
         mainContent.removeAll();
 
         H2 baslik = new H2("Gelen Talepler");
-        Paragraph aciklama = new Paragraph("Müşterilerden gelen yeni talepler. İncelemeye almak için talebi seçin.");
+        Paragraph aciklama = new Paragraph(
+            "Müşterilerden gelen yeni talepler. İncelemeye almak için talebi seçin.");
 
         grid.removeAllColumns();
         grid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px");
@@ -152,13 +171,13 @@ public class POView extends HorizontalLayout {
         mainContent.add(baslik, aciklama, grid);
     }
 
-    // ── Önceliklendirme Havuzu ──
     private void showOnceliklendirmeHavuzu() {
         mainContent.removeAll();
 
         H2 baslik = new H2("Önceliklendirme Bekleyen Müşteri Talepleri");
         Paragraph aciklama = new Paragraph(
-            "Talepler, PO tarafından girilen öncelik skoruna göre otomatik olarak yukarıdan aşağıya sıralanmaktadır.");
+            "Talepler öncelik skoruna göre sıralanmaktadır. " +
+            "Not: Geliştirici çaba tahmini Scrum Master tarafından girilecektir.");
 
         grid.removeAllColumns();
         grid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px");
@@ -171,9 +190,9 @@ public class POView extends HorizontalLayout {
         List<Request> talepler = requestService.getAllActiveRequests();
         talepler.sort((a, b) -> {
             int skorA = prioritizationService.findByRequestId(a.getRequestId())
-                .map(p -> p.getPriorityScore()).orElse(0);
+                .map(Prioritization::getPriorityScore).orElse(0);
             int skorB = prioritizationService.findByRequestId(b.getRequestId())
-                .map(p -> p.getPriorityScore()).orElse(0);
+                .map(Prioritization::getPriorityScore).orElse(0);
             return Integer.compare(skorB, skorA);
         });
         grid.setItems(talepler);
@@ -181,7 +200,6 @@ public class POView extends HorizontalLayout {
         mainContent.add(baslik, aciklama, grid);
     }
 
-    // ── İş Akışları ──
     private void showIsAkislari() {
         mainContent.removeAll();
 
@@ -212,26 +230,42 @@ public class POView extends HorizontalLayout {
     }
 
     private Span skorBadge(Request r) {
-        return prioritizationService.findByRequestId(r.getRequestId())
-            .map(p -> {
-                int skor = p.getPriorityScore();
-                String label = prioritizationService.getLabel(skor);
-                Span badge = new Span(skor + " (" + label + ")");
-                badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px")
-                    .set("font-weight", "bold");
-                if (skor >= 81)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
-                else if (skor >= 61) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
-                else if (skor >= 41) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
-                else                 badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
+    return prioritizationService.findByRequestId(r.getRequestId())
+        .map(p -> {
+            // Çaba tahmini henüz girilmemiş
+            if (p.getGelistiriciMudahalesi() == null) {
+                Span badge = new Span("Çaba Tahmini Bekleniyor");
+                badge.getStyle()
+                    .set("padding", "4px 8px")
+                    .set("border-radius", "4px")
+                    .set("background", "#fff3cd")
+                    .set("color", "#856404");
                 return badge;
-            })
-            .orElseGet(() -> {
-                Span badge = new Span("Atanmadı");
-                badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px")
-                    .set("background", "#e0e0e0").set("color", "#666");
-                return badge;
-            });
-    }
+            }
+
+            int skor = p.getPriorityScore();
+            String label = prioritizationService.getLabel(skor);
+            Span badge = new Span(skor + " (" + label + ")");
+            badge.getStyle()
+                .set("padding", "4px 8px")
+                .set("border-radius", "4px")
+                .set("font-weight", "bold");
+            if (skor >= 81)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
+            else if (skor >= 61) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
+            else if (skor >= 41) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+            else                 badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
+            return badge;
+        })
+        .orElseGet(() -> {
+            Span badge = new Span("Henuz Skorlanmadi");
+            badge.getStyle()
+                .set("padding", "4px 8px")
+                .set("border-radius", "4px")
+                .set("background", "#e0e0e0")
+                .set("color", "#666");
+            return badge;
+        });
+}
 
     private HorizontalLayout islemButonlari(Request r) {
         HorizontalLayout layout = new HorizontalLayout();
@@ -246,6 +280,7 @@ public class POView extends HorizontalLayout {
                 }
             });
             layout.add(btn);
+
         } else if (r.getStatus() == RequestStatus.UNDER_REVIEW) {
             Button oncelikBtn = new Button("Önceliklendir", e -> onceliklendirmeDialogAc(r));
             oncelikBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
@@ -254,33 +289,56 @@ public class POView extends HorizontalLayout {
             reddetBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             layout.add(oncelikBtn, reddetBtn);
+
         } else if (r.getStatus() == RequestStatus.PRIORITIZED) {
-            workflowService.findByRequestId(r.getRequestId()).ifPresentOrElse(
-                w -> {
-                    if (w.getWorkflowStatus() == WorkflowStatus.DONE) {
-                        Span done = new Span("✓ Tamamlandı");
-                        done.getStyle().set("color", "green").set("font-weight", "bold");
-                        layout.add(done);
-                    } else {
-                        Span durum = new Span("İş Akışında: " + w.getWorkflowStatus());
-                        layout.add(durum);
-                    }
-                },
-                () -> {
-                    Button isAkisiBtn = new Button("İş Akışına Çevir", e -> {
-                        try {
-                            workflowService.createWorkflow(r.getRequestId());
-                            Notification.show("Talep iş akışına alındı.", 3000, Notification.Position.TOP_CENTER);
-                            showOnceliklendirmeHavuzu();
-                        } catch (Exception ex) {
-                            Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-                        }
-                    });
-                    isAkisiBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-                    layout.add(isAkisiBtn);
+    workflowService.findByRequestId(r.getRequestId()).ifPresentOrElse(
+        w -> {
+            if (w.getWorkflowStatus() == WorkflowStatus.DONE) {
+                Span done = new Span("✓ Tamamlandı");
+                done.getStyle().set("color", "green").set("font-weight", "bold");
+                layout.add(done);
+            } else {
+                // Çaba tahmini girildi mi kontrol et
+                boolean cabaGirildi = prioritizationService
+                    .findByRequestId(r.getRequestId())
+                    .map(p -> p.getGelistiriciMudahalesi() != null)
+                    .orElse(false);
+
+                VerticalLayout durumLayout = new VerticalLayout();
+                durumLayout.setPadding(false);
+                durumLayout.setSpacing(false);
+
+                Span durumSpan = new Span("İş Akışında: " + w.getWorkflowStatus());
+                durumLayout.add(durumSpan);
+
+                if (!cabaGirildi) {
+                    Span bekliyor = new Span("⏳ Çaba tahmini bekleniyor");
+                    bekliyor.getStyle()
+                        .set("color", "#856404")
+                        .set("font-size", "12px")
+                        .set("font-style", "italic");
+                    durumLayout.add(bekliyor);
                 }
-            );
+
+                layout.add(durumLayout);
+            }
+        },
+        () -> {
+            Button isAkisiBtn = new Button("İş Akışına Çevir", e -> {
+                try {
+                    workflowService.createWorkflow(r.getRequestId());
+                    Notification.show("Talep iş akışına alındı.",
+                        3000, Notification.Position.TOP_CENTER);
+                    showOnceliklendirmeHavuzu();
+                } catch (Exception ex) {
+                    Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+                }
+            });
+            isAkisiBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            layout.add(isAkisiBtn);
         }
+    );
+}
 
         return layout;
     }
@@ -299,14 +357,17 @@ public class POView extends HorizontalLayout {
             default -> "İç Kullanıcı (1)";
         };
 
-        Span talepBaslik = new Span("Talep: " + request.getTitle());
-        talepBaslik.getStyle().set("font-weight", "bold");
+        Span talepBaslikSpan = new Span("Talep: " + request.getTitle());
+        talepBaslikSpan.getStyle().set("font-weight", "bold");
 
         Span beklemeSuresi = new Span("Bekleme Süresi Puanı: " +
             prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
 
         Span musteriDegeriSpan = new Span("Müşteri Değeri: " + musteriDegeriLabel);
         musteriDegeriSpan.getStyle().set("color", "#2C6FAC").set("font-weight", "bold");
+
+        Span smNotu = new Span("Not: Geliştirici çaba tahmini Scrum Master tarafından girilecektir.");
+        smNotu.getStyle().set("color", "#888").set("font-size", "12px").set("font-style", "italic");
 
         ComboBox<Integer> isEtkisiBox = new ComboBox<>("İş Etkisi");
         isEtkisiBox.setItems(1, 2, 3, 4, 5);
@@ -344,35 +405,26 @@ public class POView extends HorizontalLayout {
         });
         isTipiBox.setWidthFull();
 
-        ComboBox<YoneticiMudahalesi> yoneticiBox = new ComboBox<>("Yönetici Müdahalesi");
-        yoneticiBox.setItems(YoneticiMudahalesi.values());
-        yoneticiBox.setItemLabelGenerator(v -> switch (v) {
-            case IPTAL             -> "Yapılmayacak (×0.0)";
-            case NOTR              -> "Nötr (×1.0)";
-            case YONETICI_ONAYLI  -> "Yönetici Onaylı (×1.2)";
-            case SOZLESME_ZORUNLU -> "Sözleşme Gereği Zorunlu (×1.5)";
+        ComboBox<YoneticiTakdiri> takdirBox = new ComboBox<>("Yönetici Takdiri");
+        takdirBox.setItems(YoneticiTakdiri.values());
+        takdirBox.setItemLabelGenerator(v -> switch (v) {
+            case YOK       -> "Yok / Normal (0)";
+            case ONEMLI    -> "Önemli — Birim Hedefi (+5)";
+            case STRATEJIK -> "Stratejik — Şirket Hedefi (+10)";
+            case KRITIK    -> "Kritik — Acil Müdahale (+15)";
         });
-        yoneticiBox.setWidthFull();
+        takdirBox.setValue(YoneticiTakdiri.YOK);
+        takdirBox.setWidthFull();
 
-        ComboBox<GelistiriciMudahalesi> gelistiriciBox = new ComboBox<>("Geliştirici Çaba Tahmini");
-        gelistiriciBox.setItems(GelistiriciMudahalesi.values());
-        gelistiriciBox.setItemLabelGenerator(v -> switch (v) {
-            case QUICK_WIN  -> "Quick Win (< 1 gün) +10";
-            case DUSUK      -> "Düşük (1-3 gün) +5";
-            case ORTA       -> "Orta (1-2 hafta) 0";
-            case YUKSEK     -> "Yüksek (> 2 hafta) -5";
-            case COK_YUKSEK -> "Çok Yüksek / Belirsiz -10";
-        });
-        gelistiriciBox.setWidthFull();
-
-        Span skorSpan  = new Span("Hesaplanan Skor: —");
+        Span skorSpan  = new Span("Tahmini Skor: —");
         Span labelSpan = new Span("");
-        skorSpan.getStyle().set("font-weight", "bold").set("font-size", "18px");
+        skorSpan.getStyle().set("font-weight", "bold").set("font-size", "16px");
 
+        // Tahmini skor — gelistirici mudahalesi ORTA varsayılarak gösterilir.
+        // Yönetici takdiri puanı + güvenilirlik skoru da önizlemeye dahil edilir.
         Runnable skorGuncelle = () -> {
             if (isEtkisiBox.getValue() != null && acilyetBox.getValue() != null
-                    && isTipiBox.getValue() != null && yoneticiBox.getValue() != null
-                    && gelistiriciBox.getValue() != null) {
+                    && isTipiBox.getValue() != null && takdirBox.getValue() != null) {
 
                 Prioritization temp = new Prioritization();
                 temp.setIsEtkisi(isEtkisiBox.getValue());
@@ -382,11 +434,11 @@ public class POView extends HorizontalLayout {
                 temp.setIsTimiPuan(isTipiBox.getValue().getPuan());
                 temp.setBeklemeSuresiPuan(
                     prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
-                temp.setYoneticiMudahalesi(yoneticiBox.getValue());
-                temp.setGelistiriciMudahalesi(gelistiriciBox.getValue());
+                temp.setGelistiriciMudahalesi(GelistiriciMudahalesi.ORTA); // varsayılan
 
-                int skor = prioritizationService.calculateScore(temp);
-                skorSpan.setText("Hesaplanan Skor: " + skor);
+                int credibility = prioritizationService.calculateCredibilityScore(request.getCustomerId());
+                int skor = prioritizationService.calculateFinalScore(temp, takdirBox.getValue(), credibility);
+                skorSpan.setText("Tahmini Skor: " + skor);
                 labelSpan.setText(" — " + prioritizationService.getLabel(skor));
             }
         };
@@ -394,13 +446,11 @@ public class POView extends HorizontalLayout {
         isEtkisiBox.addValueChangeListener(e -> skorGuncelle.run());
         acilyetBox.addValueChangeListener(e -> skorGuncelle.run());
         isTipiBox.addValueChangeListener(e -> skorGuncelle.run());
-        yoneticiBox.addValueChangeListener(e -> skorGuncelle.run());
-        gelistiriciBox.addValueChangeListener(e -> skorGuncelle.run());
+        takdirBox.addValueChangeListener(e -> skorGuncelle.run());
 
         Button kaydetBtn = new Button("Değerleri Kaydet", e -> {
             if (isEtkisiBox.getValue() == null || acilyetBox.getValue() == null
-                    || isTipiBox.getValue() == null || yoneticiBox.getValue() == null
-                    || gelistiriciBox.getValue() == null) {
+                    || isTipiBox.getValue() == null || takdirBox.getValue() == null) {
                 Notification.show("Tüm alanları seçiniz.", 3000, Notification.Position.MIDDLE);
                 return;
             }
@@ -410,13 +460,15 @@ public class POView extends HorizontalLayout {
                 p.setIsEtkisi(isEtkisiBox.getValue());
                 p.setAciliyet(acilyetBox.getValue());
                 p.setIsTipi(isTipiBox.getValue());
-                p.setYoneticiMudahalesi(yoneticiBox.getValue());
-                p.setGelistiriciMudahalesi(gelistiriciBox.getValue());
 
-                prioritizationService.savePrioritization(
+                // Yönetici takdiri talep üzerinde tutulur
+                requestService.updateYoneticiTakdiri(request.getRequestId(), takdirBox.getValue());
+
+                prioritizationService.savePrioritizationByPO(
                     p, request.getCustomerId(), request.getCreatedAt());
 
-                Notification.show("Önceliklendirme kaydedildi.", 3000, Notification.Position.TOP_CENTER);
+                Notification.show("Önceliklendirme kaydedildi. Scrum Master çaba tahminini girecektir.",
+                    4000, Notification.Position.TOP_CENTER);
                 dialog.close();
                 showOnceliklendirmeHavuzu();
             } catch (Exception ex) {
@@ -430,11 +482,38 @@ public class POView extends HorizontalLayout {
         HorizontalLayout skorLayout = new HorizontalLayout(skorSpan, labelSpan);
         skorLayout.setAlignItems(Alignment.BASELINE);
 
-        VerticalLayout icerik = new VerticalLayout(
-            talepBaslik, beklemeSuresi, musteriDegeriSpan,
-            isEtkisiBox, acilyetBox, isTipiBox,
-            yoneticiBox, gelistiriciBox, skorLayout
+        // Dosyalar
+List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(request.getRequestId());
+VerticalLayout dosyaLayout = new VerticalLayout();
+dosyaLayout.setPadding(false);
+dosyaLayout.setSpacing(false);
+
+if (!dosyalar.isEmpty()) {
+    H4 dosyaBaslik = new H4("Ekli Dosyalar");
+    dosyaBaslik.getStyle().set("margin-bottom", "4px");
+    dosyaLayout.add(dosyaBaslik);
+
+    for (RequestFile dosya : dosyalar) {
+        Anchor link = new Anchor(
+            "data:application/octet-stream;base64," +
+            java.util.Base64.getEncoder().encodeToString(dosya.getFileData()),
+            "📎 " + dosya.getFileName() + " (" + formatFileSize(dosya.getFileSize()) + ")"
         );
+        link.getElement().setAttribute("download", dosya.getFileName());
+        link.getStyle().set("display", "block").set("margin-bottom", "4px");
+        dosyaLayout.add(link);
+    }
+} else {
+    Span yok = new Span("Ekli dosya yok.");
+    yok.getStyle().set("color", "#888").set("font-size", "12px");
+    dosyaLayout.add(yok);
+}
+      VerticalLayout icerik = new VerticalLayout(
+    talepBaslikSpan, beklemeSuresi, musteriDegeriSpan, smNotu,
+    dosyaLayout,                    // bunu ekle
+    isEtkisiBox, acilyetBox, isTipiBox,
+    takdirBox, skorLayout
+);
         icerik.setPadding(false);
 
         dialog.add(icerik);
@@ -465,6 +544,23 @@ public class POView extends HorizontalLayout {
         dialog.add(new VerticalLayout(gerekcaField));
         dialog.getFooter().add(new Button("İptal", e -> dialog.close()), reddetBtn);
         dialog.open();
+    }
+    private String formatFileSize(Long bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+    return (bytes / (1024 * 1024)) + " MB";
+}
+
+    private Span durumBadge(RequestStatus status) {
+        Span badge = new Span(status.name());
+        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px");
+        switch (status) {
+            case NEW          -> badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
+            case UNDER_REVIEW -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
+            case PRIORITIZED  -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+            case REJECTED     -> badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
+        }
+        return badge;
     }
 
     private String musteri(Long customerId) {

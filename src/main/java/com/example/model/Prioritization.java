@@ -3,7 +3,6 @@ package com.example.model;
 
 import com.example.enums.GelistiriciMudahalesi;
 import com.example.enums.IsTipi;
-import com.example.enums.YoneticiMudahalesi;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -17,7 +16,6 @@ public class Prioritization {
     private IsTipi isTipi;
     private int isTimiPuan;
     private int beklemeSuresiPuan;
-    private YoneticiMudahalesi yoneticiMudahalesi;
     private GelistiriciMudahalesi gelistiriciMudahalesi;
     private double bazSkor;
     private int priorityScore;

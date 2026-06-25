@@ -2,7 +2,9 @@ package com.example.views;
 
 import com.example.enums.RequestStatus;
 import com.example.model.Request;
+import com.example.model.RequestFile;
 import com.example.model.User;
+import com.example.service.RequestFileService;
 import com.example.service.RequestService;
 import com.example.service.UserService;
 import com.vaadin.flow.component.button.Button;
@@ -15,9 +17,18 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
+import com.example.model.RequestFile;
+import com.example.service.RequestFileService;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
+
+import java.util.List;
+
 import org.springframework.security.core.context.SecurityContextHolder;
 
 @Route("customer")
@@ -32,10 +43,15 @@ public class CustomerView extends HorizontalLayout {
 
     private final VerticalLayout mainContent = new VerticalLayout();
     private final Grid<Request> grid = new Grid<>(Request.class, false);
+    private final RequestFileService requestFileService;
 
-    public CustomerView(RequestService requestService, UserService userService) {
-        this.requestService = requestService;
-        this.userService = userService;
+public CustomerView(RequestService requestService,
+                    UserService userService,
+                    RequestFileService requestFileService) {
+    this.requestService = requestService;
+    this.userService = userService;
+    this.requestFileService = requestFileService;
+
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -95,7 +111,7 @@ public class CustomerView extends HorizontalLayout {
 
         sidebar.add(baslik, altBaslik, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
-        sidebar.add(divider, girisYapan, kullaniciAdi);
+        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
         return sidebar;
     }
@@ -113,6 +129,18 @@ public class CustomerView extends HorizontalLayout {
         return btn;
     }
 
+    private Button buildLogoutButton() {
+        Button logoutBtn = new Button("Çıkış Yap",
+            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
+        logoutBtn.getStyle()
+            .set("background-color", "#c0392b")
+            .set("color", "white")
+            .set("width", "100%")
+            .set("margin-top", "12px")
+            .set("cursor", "pointer");
+        return logoutBtn;
+    }
+
     private VerticalLayout buildMainContent() {
         mainContent.setSizeFull();
         mainContent.setPadding(true);
@@ -121,43 +149,73 @@ public class CustomerView extends HorizontalLayout {
     }
 
     private void showYeniTalepFormu() {
-        mainContent.removeAll();
+    mainContent.removeAll();
 
-        H2 baslik = new H2("Yeni Destek / Geliştirme Talebi Bildir");
+    H2 baslik = new H2("Yeni Destek / Geliştirme Talebi Bildir");
 
-        TextField talepBasligi = new TextField("Talep Başlığı");
-        talepBasligi.setPlaceholder("Örn: Ödeme ekranında kredi kartı hata uyarısı alınıyor...");
-        talepBasligi.setWidthFull();
+    TextField talepBasligi = new TextField("Talep Başlığı");
+    talepBasligi.setPlaceholder("Örn: Ödeme ekranında kredi kartı hata uyarısı alınıyor...");
+    talepBasligi.setWidthFull();
 
-        TextArea talepDetayi = new TextArea("Talep Detayı ve Açıklama");
-        talepDetayi.setPlaceholder("Yaşanan problemi veya eklenmesini istediğiniz özelliği detaylıca yazınız...");
-        talepDetayi.setWidthFull();
-        talepDetayi.setMinHeight("150px");
+    TextArea talepDetayi = new TextArea("Talep Detayı ve Açıklama");
+    talepDetayi.setPlaceholder("Yaşanan problemi veya eklenmesini istediğiniz özelliği detaylıca yazınız...");
+    talepDetayi.setWidthFull();
+    talepDetayi.setMinHeight("150px");
 
-        Button gondерBtn = new Button("Talebi Gönder");
-        gondерBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        gondерBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+    // Dosya upload
+    MultiFileMemoryBuffer buffer = new MultiFileMemoryBuffer();
+    Upload upload = new Upload(buffer);
+    upload.setAcceptedFileTypes(
+        "image/*", "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt", ".xlsx", ".xls"
+    );
+    upload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
+    upload.setMaxFiles(5);
+    upload.setDropLabel(new Span("Dosyaları buraya sürükleyin veya seçin (max 5 dosya, 10 MB)"));
 
-        gondерBtn.addClickListener(e -> {
-            try {
-                Request request = new Request();
-                request.setCustomerId(currentUserId);
-                request.setTitle(talepBasligi.getValue());
-                request.setDescription(talepDetayi.getValue());
-                requestService.createRequest(request);
-                Notification.show("Talebiniz alındı.", 3000, Notification.Position.TOP_CENTER);
-                showTaleplerim();
-            } catch (IllegalArgumentException ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+    Span uploadNot = new Span("Desteklenen: PDF, Word, Excel, resim, metin dosyaları");
+    uploadNot.getStyle().set("color", "#888").set("font-size", "12px");
+
+    Button gondерBtn = new Button("Talebi Gönder");
+    gondерBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    gondерBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+   gondерBtn.addClickListener(e -> {
+    try {
+        Request request = new Request();
+        request.setCustomerId(currentUserId);
+        request.setTitle(talepBasligi.getValue());
+        request.setDescription(talepDetayi.getValue());
+        requestService.createRequest(request);
+
+        // En son eklenen talebin ID'sini al
+        requestService.findLastRequestIdByCustomer(currentUserId).ifPresent(requestId -> {
+            for (String fileName : buffer.getFiles()) {
+                try {
+                    byte[] fileData = buffer.getInputStream(fileName).readAllBytes();
+                    requestFileService.saveFile(requestId, fileName, fileData);
+                } catch (Exception ex) {
+                    Notification.show("Dosya yüklenemedi: " + fileName,
+                        3000, Notification.Position.MIDDLE);
+                }
             }
         });
 
-        HorizontalLayout btnLayout = new HorizontalLayout(gondерBtn);
-        btnLayout.setWidthFull();
-        btnLayout.setJustifyContentMode(JustifyContentMode.END);
-
-        mainContent.add(baslik, talepBasligi, talepDetayi, btnLayout);
+        Notification.show("Talebiniz alındı.", 3000, Notification.Position.TOP_CENTER);
+        showTaleplerim();
+    } catch (IllegalArgumentException ex) {
+        Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
     }
+});
+
+    HorizontalLayout btnLayout = new HorizontalLayout(gondерBtn);
+    btnLayout.setWidthFull();
+    btnLayout.setJustifyContentMode(JustifyContentMode.END);
+
+    mainContent.add(baslik, talepBasligi, talepDetayi, upload, uploadNot, btnLayout);
+}
 
     private void showTaleplerim() {
         mainContent.removeAll();
@@ -182,25 +240,53 @@ public class CustomerView extends HorizontalLayout {
     }
 
     private void detayDialogAc(Request request) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Talep Detayı");
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Talep Detayı");
 
-        VerticalLayout icerik = new VerticalLayout();
-        icerik.add(new Span("Başlık: " + request.getTitle()));
-        icerik.add(new Span("Açıklama: " + request.getDescription()));
-        icerik.add(new Span("Durum: " + request.getStatus()));
-        icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
+    VerticalLayout icerik = new VerticalLayout();
+    icerik.add(new Span("Başlık: " + request.getTitle()));
+    icerik.add(new Span("Açıklama: " + request.getDescription()));
+    icerik.add(new Span("Durum: " + request.getStatus()));
+    icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
 
-        if (request.getStatus() == RequestStatus.REJECTED && request.getRejectionReason() != null) {
-            Span ret = new Span("Ret Gerekçesi: " + request.getRejectionReason());
-            ret.getStyle().set("color", "red");
-            icerik.add(ret);
-        }
-
-        dialog.add(icerik);
-        dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
-        dialog.open();
+    if (request.getStatus() == RequestStatus.REJECTED
+            && request.getRejectionReason() != null) {
+        Span ret = new Span("Ret Gerekçesi: " + request.getRejectionReason());
+        ret.getStyle().set("color", "red");
+        icerik.add(ret);
     }
+
+    // Dosyalar
+    List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(request.getRequestId());
+    if (!dosyalar.isEmpty()) {
+        H4 dosyaBaslik = new H4("Ekli Dosyalar");
+        icerik.add(dosyaBaslik);
+
+        for (RequestFile dosya : dosyalar) {
+            Anchor link = new Anchor(
+                getDownloadUrl(dosya),
+                dosya.getFileName() + " (" + formatFileSize(dosya.getFileSize()) + ")"
+            );
+            link.getElement().setAttribute("download", dosya.getFileName());
+            icerik.add(link);
+        }
+    }
+
+    dialog.add(icerik);
+    dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
+    dialog.open();
+}
+
+private String getDownloadUrl(RequestFile dosya) {
+    return "data:application/octet-stream;base64," +
+        java.util.Base64.getEncoder().encodeToString(dosya.getFileData());
+}
+
+private String formatFileSize(Long bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+    return (bytes / (1024 * 1024)) + " MB";
+}
 
     private Span durumBadge(RequestStatus status) {
         Span badge = new Span(status.name());

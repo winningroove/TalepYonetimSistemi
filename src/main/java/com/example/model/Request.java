@@ -2,6 +2,7 @@
 package com.example.model;
 
 import com.example.enums.RequestStatus;
+import com.example.enums.YoneticiTakdiri;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -13,6 +14,7 @@ public class Request {
     private String description;
     private RequestStatus status;
     private String rejectionReason;
+    private YoneticiTakdiri yoneticiTakdiri;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

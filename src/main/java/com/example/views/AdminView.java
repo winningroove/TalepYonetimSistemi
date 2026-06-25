@@ -87,7 +87,7 @@ public class AdminView extends HorizontalLayout {
 
         sidebar.add(baslik, altBaslik, menuBaslik, kullanicilarBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi);
+        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
         return sidebar;
     }
@@ -103,6 +103,18 @@ public class AdminView extends HorizontalLayout {
             .set("cursor", "pointer")
             .set("padding", "8px 0");
         return btn;
+    }
+
+    private Button buildLogoutButton() {
+        Button logoutBtn = new Button("Çıkış Yap",
+            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
+        logoutBtn.getStyle()
+            .set("background-color", "#c0392b")
+            .set("color", "white")
+            .set("width", "100%")
+            .set("margin-top", "12px")
+            .set("cursor", "pointer");
+        return logoutBtn;
     }
 
     private VerticalLayout buildMainContent() {

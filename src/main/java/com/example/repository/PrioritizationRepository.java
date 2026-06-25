@@ -3,7 +3,6 @@ package com.example.repository;
 
 import com.example.enums.GelistiriciMudahalesi;
 import com.example.enums.IsTipi;
-import com.example.enums.YoneticiMudahalesi;
 import com.example.model.Prioritization;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,9 +31,9 @@ public class PrioritizationRepository {
         p.setIsTipi(IsTipi.valueOf(rs.getString("is_tipi")));
         p.setIsTimiPuan(rs.getInt("is_tipi_puan"));
         p.setBeklemeSuresiPuan(rs.getInt("bekleme_suresi_puan"));
-        p.setYoneticiMudahalesi(YoneticiMudahalesi.valueOf(rs.getString("yonetici_mudahalesi")));
-        p.setGelistiriciMudahalesi(GelistiriciMudahalesi.valueOf(rs.getString("gelistirici_mudahalesi")));
-        p.setBazSkor(rs.getDouble("baz_skor"));
+p.setGelistiriciMudahalesi(rs.getString("gelistirici_mudahalesi") != null
+        ? GelistiriciMudahalesi.valueOf(rs.getString("gelistirici_mudahalesi"))
+        : null);        p.setBazSkor(rs.getDouble("baz_skor"));
         p.setPriorityScore(rs.getInt("priority_score"));
         p.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         p.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
@@ -56,50 +55,48 @@ public class PrioritizationRepository {
     }
 
     public void save(Prioritization p) {
-        String sql = """
-            INSERT INTO Eren_prioritizations
-                (priority_id, request_id, is_etkisi, aciliyet, musteri_degeri_puan,
-                 is_tipi, is_tipi_puan, bekleme_suresi_puan, yonetici_mudahalesi,
-                 gelistirici_mudahalesi, baz_skor, priority_score, created_at, updated_at)
-            VALUES
-                (Eren_seq_prioritizations.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP, SYSTIMESTAMP)
-            """;
-        jdbcTemplate.update(sql,
-                p.getRequestId(),
-                p.getIsEtkisi(),
-                p.getAciliyet(),
-                p.getMusteriDegeriPuan(),
-                p.getIsTipi().name(),
-                p.getIsTimiPuan(),
-                p.getBeklemeSuresiPuan(),
-                p.getYoneticiMudahalesi().name(),
-                p.getGelistiriciMudahalesi().name(),
-                p.getBazSkor(),
-                p.getPriorityScore()
-        );
-    }
+    String sql = """
+        INSERT INTO Eren_prioritizations
+            (priority_id, request_id, is_etkisi, aciliyet, musteri_degeri_puan,
+             is_tipi, is_tipi_puan, bekleme_suresi_puan,
+             gelistirici_mudahalesi, baz_skor, priority_score, created_at, updated_at)
+        VALUES
+            (Eren_seq_prioritizations.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP, SYSTIMESTAMP)
+        """;
+    jdbcTemplate.update(sql,
+            p.getRequestId(),
+            p.getIsEtkisi(),
+            p.getAciliyet(),
+            p.getMusteriDegeriPuan(),
+            p.getIsTipi().name(),
+            p.getIsTimiPuan(),
+            p.getBeklemeSuresiPuan(),
+            p.getGelistiriciMudahalesi() != null ? p.getGelistiriciMudahalesi().name() : null,
+            p.getBazSkor(),
+            p.getPriorityScore()
+    );
+}
 
-    public void update(Prioritization p) {
-        String sql = """
-            UPDATE Eren_prioritizations
-            SET is_etkisi = ?, aciliyet = ?, musteri_degeri_puan = ?,
-                is_tipi = ?, is_tipi_puan = ?, bekleme_suresi_puan = ?,
-                yonetici_mudahalesi = ?, gelistirici_mudahalesi = ?,
-                baz_skor = ?, priority_score = ?, updated_at = SYSTIMESTAMP
-            WHERE request_id = ?
-            """;
-        jdbcTemplate.update(sql,
-                p.getIsEtkisi(),
-                p.getAciliyet(),
-                p.getMusteriDegeriPuan(),
-                p.getIsTipi().name(),
-                p.getIsTimiPuan(),
-                p.getBeklemeSuresiPuan(),
-                p.getYoneticiMudahalesi().name(),
-                p.getGelistiriciMudahalesi().name(),
-                p.getBazSkor(),
-                p.getPriorityScore(),
-                p.getRequestId()
-        );
-    }
+public void update(Prioritization p) {
+    String sql = """
+        UPDATE Eren_prioritizations
+        SET is_etkisi = ?, aciliyet = ?, musteri_degeri_puan = ?,
+            is_tipi = ?, is_tipi_puan = ?, bekleme_suresi_puan = ?,
+            gelistirici_mudahalesi = ?,
+            baz_skor = ?, priority_score = ?, updated_at = SYSTIMESTAMP
+        WHERE request_id = ?
+        """;
+    jdbcTemplate.update(sql,
+            p.getIsEtkisi(),
+            p.getAciliyet(),
+            p.getMusteriDegeriPuan(),
+            p.getIsTipi().name(),
+            p.getIsTimiPuan(),
+            p.getBeklemeSuresiPuan(),
+            p.getGelistiriciMudahalesi() != null ? p.getGelistiriciMudahalesi().name() : null,
+            p.getBazSkor(),
+            p.getPriorityScore(),
+            p.getRequestId()
+    );
+}
 }

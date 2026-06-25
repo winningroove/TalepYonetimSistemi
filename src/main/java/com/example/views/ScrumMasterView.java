@@ -1,5 +1,6 @@
 package com.example.views;
-
+import com.example.enums.GelistiriciMudahalesi;
+import com.example.service.PrioritizationService;
 import com.example.enums.Role;
 import com.example.enums.WorkflowStatus;
 import com.example.model.User;
@@ -30,16 +31,19 @@ public class ScrumMasterView extends HorizontalLayout {
     private final WorkflowService workflowService;
     private final RequestService requestService;
     private final UserService userService;
+    private final PrioritizationService prioritizationService;
+
 
     private String currentUserName;
     private final VerticalLayout mainContent = new VerticalLayout();
-
-    public ScrumMasterView(WorkflowService workflowService,
-                           RequestService requestService,
-                           UserService userService) {
-        this.workflowService = workflowService;
-        this.requestService = requestService;
-        this.userService = userService;
+public ScrumMasterView(WorkflowService workflowService,
+                       RequestService requestService,
+                       UserService userService,
+                       PrioritizationService prioritizationService) {
+    this.workflowService = workflowService;
+    this.requestService = requestService;
+    this.userService = userService;
+    this.prioritizationService = prioritizationService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
@@ -98,7 +102,7 @@ public class ScrumMasterView extends HorizontalLayout {
 
         sidebar.add(baslik, altBaslik, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi);
+        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
         return sidebar;
     }
@@ -114,6 +118,18 @@ public class ScrumMasterView extends HorizontalLayout {
             .set("cursor", "pointer")
             .set("padding", "8px 0");
         return btn;
+    }
+
+    private Button buildLogoutButton() {
+        Button logoutBtn = new Button("Çıkış Yap",
+            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
+        logoutBtn.getStyle()
+            .set("background-color", "#c0392b")
+            .set("color", "white")
+            .set("width", "100%")
+            .set("margin-top", "12px")
+            .set("cursor", "pointer");
+        return logoutBtn;
     }
 
     private VerticalLayout buildMainContent() {
@@ -197,52 +213,85 @@ public class ScrumMasterView extends HorizontalLayout {
     }
 
     // ── Geliştirici Atama Dialogu ──
-    private void atamaDiyaloguAc(Workflow workflow) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Geliştirici Ata — " + talepBasligi(workflow.getRequestId()));
+ private void atamaDiyaloguAc(Workflow workflow) {
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Gelistirici Ata — " + talepBasligi(workflow.getRequestId()));
 
-        List<User> developerlar = userService.findAllActive().stream()
-            .filter(u -> u.getRole() == Role.DEVELOPER)
-            .toList();
+    List<User> developerlar = userService.findAllActive().stream()
+        .filter(u -> u.getRole() == Role.DEVELOPER)
+        .toList();
 
-        ComboBox<User> developerBox = new ComboBox<>("Geliştirici Seç");
-        developerBox.setItems(developerlar);
-        developerBox.setItemLabelGenerator(User::getNameSurname);
-        developerBox.setWidthFull();
+    ComboBox<User> developerBox = new ComboBox<>("Gelistirici Sec");
+    developerBox.setItems(developerlar);
+    developerBox.setItemLabelGenerator(User::getNameSurname);
+    developerBox.setWidthFull();
 
-        if (workflow.getDeveloperId() != null) {
-            developerlar.stream()
-                .filter(u -> u.getUserId().equals(workflow.getDeveloperId()))
-                .findFirst()
-                .ifPresent(developerBox::setValue);
-        }
+    if (workflow.getDeveloperId() != null) {
+        developerlar.stream()
+            .filter(u -> u.getUserId().equals(workflow.getDeveloperId()))
+            .findFirst()
+            .ifPresent(developerBox::setValue);
+    }
 
-        Button ataBtn = new Button("Ata", e -> {
-            if (developerBox.getValue() == null) {
-                Notification.show("Geliştirici seçiniz.", 3000, Notification.Position.MIDDLE);
-                return;
-            }
-            try {
-                workflowService.assignDeveloperBySM(
-                    workflow.getTaskId(),
-                    developerBox.getValue().getUserId(),
-                    workflow.getVersion()
-                );
-                Notification.show("Geliştirici atandı.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showSprintBoard();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+    ComboBox<GelistiriciMudahalesi> cabaBox = new ComboBox<>("Caba Tahmini");
+    cabaBox.setItems(GelistiriciMudahalesi.values());
+    cabaBox.setItemLabelGenerator(v -> switch (v) {
+        case QUICK_WIN  -> "Quick Win (< 1 gun) +10";
+        case DUSUK      -> "Dusuk (1-3 gun) +5";
+        case ORTA       -> "Orta (1-2 hafta) 0";
+        case YUKSEK     -> "Yuksek (> 2 hafta) -5";
+        case COK_YUKSEK -> "Cok Yuksek / Belirsiz -10";
+    });
+    cabaBox.setWidthFull();
+
+    // Mevcut deger varsa set et
+    prioritizationService.findByRequestId(workflow.getRequestId())
+        .ifPresent(p -> {
+            if (p.getGelistiriciMudahalesi() != null) {
+                cabaBox.setValue(p.getGelistiriciMudahalesi());
             }
         });
-        ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
 
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
+    Button ataBtn = new Button("Ata", e -> {
+        if (developerBox.getValue() == null) {
+            Notification.show("Gelistirici seciniz.", 3000, Notification.Position.MIDDLE);
+            return;
+        }
+        if (cabaBox.getValue() == null) {
+            Notification.show("Caba tahmini seciniz.", 3000, Notification.Position.MIDDLE);
+            return;
+        }
+        try {
+            // Gelistirici ata
+            workflowService.assignDeveloperBySM(
+                workflow.getTaskId(),
+                developerBox.getValue().getUserId(),
+                workflow.getVersion()
+            );
 
-        dialog.add(new VerticalLayout(developerBox));
-        dialog.getFooter().add(iptalBtn, ataBtn);
-        dialog.open();
-    }
+            // Caba tahminini kaydet ve nihai skoru hesapla
+            // (yonetici takdiri ve guvenilirlik skoru servis icinde talepten okunur)
+            prioritizationService.updateGelistiriciMudahalesi(
+                workflow.getRequestId(),
+                cabaBox.getValue()
+            );
+
+            Notification.show("Gelistirici atandi, skor guncellendi.",
+                3000, Notification.Position.TOP_CENTER);
+            dialog.close();
+            showSprintBoard();
+        } catch (Exception ex) {
+            Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+        }
+    });
+    ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+    Button iptalBtn = new Button("Iptal", e -> dialog.close());
+
+    dialog.add(new VerticalLayout(developerBox, cabaBox));
+    dialog.getFooter().add(iptalBtn, ataBtn);
+    dialog.open();
+}
 
     private String talepBasligi(Long requestId) {
         return requestService.findById(requestId)
