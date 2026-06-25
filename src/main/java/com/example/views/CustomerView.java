@@ -1,12 +1,14 @@
 package com.example.views;
 
 import com.example.enums.RequestStatus;
+import com.example.enums.WorkflowStatus;
 import com.example.model.Request;
 import com.example.model.RequestFile;
 import com.example.model.User;
 import com.example.service.RequestFileService;
 import com.example.service.RequestService;
 import com.example.service.UserService;
+import com.example.service.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -33,7 +35,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 @Route("customer")
 @PageTitle("Müşteri Portalı")
-@RolesAllowed("ROLE_CUSTOMER")
+@RolesAllowed("CUSTOMER")
 public class CustomerView extends HorizontalLayout {
 
     private final RequestService requestService;
@@ -44,13 +46,16 @@ public class CustomerView extends HorizontalLayout {
     private final VerticalLayout mainContent = new VerticalLayout();
     private final Grid<Request> grid = new Grid<>(Request.class, false);
     private final RequestFileService requestFileService;
+    private final WorkflowService workflowService;
 
 public CustomerView(RequestService requestService,
                     UserService userService,
-                    RequestFileService requestFileService) {
+                    RequestFileService requestFileService,
+                    WorkflowService workflowService) {
     this.requestService = requestService;
     this.userService = userService;
     this.requestFileService = requestFileService;
+    this.workflowService = workflowService;
 
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -225,7 +230,7 @@ public CustomerView(RequestService requestService,
         grid.removeAllColumns();
         grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
         grid.addColumn(r -> r.getCreatedAt().toLocalDate()).setHeader("Tarih");
-        grid.addComponentColumn(r -> durumBadge(r.getStatus())).setHeader("Durum");
+        grid.addComponentColumn(this::durumBadgeFor).setHeader("Durum");
         grid.addComponentColumn(r -> {
             Button detayBtn = new Button("Detay", e -> detayDialogAc(r));
             return detayBtn;
@@ -246,7 +251,7 @@ public CustomerView(RequestService requestService,
     VerticalLayout icerik = new VerticalLayout();
     icerik.add(new Span("Başlık: " + request.getTitle()));
     icerik.add(new Span("Açıklama: " + request.getDescription()));
-    icerik.add(new Span("Durum: " + request.getStatus()));
+    icerik.add(new Span("Durum: " + durumMetni(request)));
     icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
 
     if (request.getStatus() == RequestStatus.REJECTED
@@ -298,5 +303,29 @@ private String formatFileSize(Long bytes) {
             case REJECTED     -> badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
         }
         return badge;
+    }
+
+    // İş akışı tamamlandıysa (workflow DONE) talep "TAMAMLANDI" olarak gösterilir;
+    // request.status veritabanında PRIORITIZED olarak kalır.
+    private boolean isTamamlandi(Request r) {
+        return r.getStatus() == RequestStatus.PRIORITIZED
+            && workflowService.findByRequestId(r.getRequestId())
+                .map(w -> w.getWorkflowStatus() == WorkflowStatus.DONE)
+                .orElse(false);
+    }
+
+    private String durumMetni(Request r) {
+        return isTamamlandi(r) ? "TAMAMLANDI" : r.getStatus().name();
+    }
+
+    private Span durumBadgeFor(Request r) {
+        if (isTamamlandi(r)) {
+            Span badge = new Span("TAMAMLANDI");
+            badge.getStyle()
+                .set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px")
+                .set("background", "#d4edda").set("color", "#155724").set("font-weight", "bold");
+            return badge;
+        }
+        return durumBadge(r.getStatus());
     }
 }

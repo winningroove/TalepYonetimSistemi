@@ -26,7 +26,7 @@ import java.util.List;
 
 @Route("developer")
 @PageTitle("Geliştirici Paneli")
-@RolesAllowed("ROLE_DEVELOPER")
+@RolesAllowed("DEVELOPER")
 public class DeveloperView extends HorizontalLayout {
 
     private final WorkflowService workflowService;

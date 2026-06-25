@@ -25,7 +25,7 @@ import java.util.List;
 
 @Route("scrum-master")
 @PageTitle("Scrum Master Paneli")
-@RolesAllowed("ROLE_SCRUM_MASTER")
+@RolesAllowed("SCRUM_MASTER")
 public class ScrumMasterView extends HorizontalLayout {
 
     private final WorkflowService workflowService;

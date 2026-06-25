@@ -23,7 +23,7 @@ import java.util.List;
 
 @Route("po")
 @PageTitle("Ürün Sorumlusu Paneli")
-@RolesAllowed("ROLE_PRODUCT_OWNER")
+@RolesAllowed("PRODUCT_OWNER")
 public class POView extends HorizontalLayout {
 
     private final RequestService requestService;
@@ -366,6 +366,25 @@ public class POView extends HorizontalLayout {
         Span musteriDegeriSpan = new Span("Müşteri Değeri: " + musteriDegeriLabel);
         musteriDegeriSpan.getStyle().set("color", "#2C6FAC").set("font-weight", "bold");
 
+        // Requester Credibility (güvenilirlik) — talep sahibinin geçmiş performansı
+        var credStats = requestService.getCredibilityStats(request.getCustomerId());
+        int credibilityScore = prioritizationService.calculateCredibilityScore(request.getCustomerId());
+        String credText;
+        if (credStats.total() < 5) {
+            credText = String.format(
+                "Güvenilirlik Skoru: 0 (yetersiz geçmiş — toplam %d talep, en az 5 gerekir)",
+                credStats.total());
+        } else {
+            credText = String.format(
+                "Güvenilirlik Skoru: %+d  (Toplam %d • Onaylanan %d • Reddedilen %d)",
+                credibilityScore, credStats.total(), credStats.approved(), credStats.rejected());
+        }
+        Span credibilitySpan = new Span(credText);
+        credibilitySpan.getStyle().set("font-weight", "bold");
+        if (credibilityScore > 0)      credibilitySpan.getStyle().set("color", "#1e7e34"); // ödül
+        else if (credibilityScore < 0) credibilitySpan.getStyle().set("color", "#c0392b"); // ceza
+        else                           credibilitySpan.getStyle().set("color", "#666");
+
         Span smNotu = new Span("Not: Geliştirici çaba tahmini Scrum Master tarafından girilecektir.");
         smNotu.getStyle().set("color", "#888").set("font-size", "12px").set("font-style", "italic");
 
@@ -479,6 +498,13 @@ public class POView extends HorizontalLayout {
 
         Button iptalBtn = new Button("İptal", e -> dialog.close());
 
+        // Detayları/dosyaları gördükten sonra doğrudan reddetme seçeneği
+        Button reddetBtn = new Button("Reddet", e -> {
+            dialog.close();
+            reddetDialogAc(request);
+        });
+        reddetBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+
         HorizontalLayout skorLayout = new HorizontalLayout(skorSpan, labelSpan);
         skorLayout.setAlignItems(Alignment.BASELINE);
 
@@ -509,7 +535,7 @@ if (!dosyalar.isEmpty()) {
     dosyaLayout.add(yok);
 }
       VerticalLayout icerik = new VerticalLayout(
-    talepBaslikSpan, beklemeSuresi, musteriDegeriSpan, smNotu,
+    talepBaslikSpan, beklemeSuresi, musteriDegeriSpan, credibilitySpan, smNotu,
     dosyaLayout,                    // bunu ekle
     isEtkisiBox, acilyetBox, isTipiBox,
     takdirBox, skorLayout
@@ -517,7 +543,7 @@ if (!dosyalar.isEmpty()) {
         icerik.setPadding(false);
 
         dialog.add(icerik);
-        dialog.getFooter().add(iptalBtn, kaydetBtn);
+        dialog.getFooter().add(iptalBtn, reddetBtn, kaydetBtn);
         dialog.open();
     }
 

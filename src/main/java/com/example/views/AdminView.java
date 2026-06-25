@@ -23,7 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 @Route("admin")
 @PageTitle("Yönetim Paneli")
-@RolesAllowed("ROLE_ADMIN")
+@RolesAllowed("ADMIN")
 public class AdminView extends HorizontalLayout {
 
     private final UserService userService;

@@ -2,6 +2,8 @@ package com.example.security;
 
 import com.example.model.User;
 import com.example.repository.UserRepository;
+import com.example.views.LoginView;
+import com.vaadin.flow.spring.security.VaadinSecurityConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -55,25 +57,19 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
- @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/**").permitAll()
-        )
-   .formLogin(form -> form
-    .loginPage("/login")
-    .loginProcessingUrl("/login")
-    .usernameParameter("username")
-    .passwordParameter("password")
-    .permitAll()
-)
-        .logout(logout -> logout
-            .logoutUrl("/logout")
-            .logoutSuccessUrl("/login")
-            .permitAll()
-        );
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Vaadin güvenlik entegrasyonu: NavigationAccessControl'ü etkinleştirir,
+        // view'lardaki @RolesAllowed / @PermitAll / @AnonymousAllowed anotasyonlarını
+        // zorunlu kılar ve giriş yapmamış kullanıcıları LoginView'e yönlendirir.
+        //
+        // CSRF, projenin mevcut yapısına uygun olarak kapalı tutulur; böylece
+        // GET ile /logout ve LoginForm gönderimi çalışmaya devam eder.
+        http.csrf(csrf -> csrf.disable())
+            .with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer
+                .loginView(LoginView.class)
+                .enableCsrfConfiguration(false));
 
-    return http.build();
-}}
+        return http.build();
+    }
+}
