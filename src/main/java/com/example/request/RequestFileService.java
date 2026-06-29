@@ -1,8 +1,5 @@
-// service/RequestFileService.java
-package com.example.service;
+package com.example.request;
 
-import com.example.model.RequestFile;
-import com.example.repository.RequestFileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +12,7 @@ public class RequestFileService {
     private final RequestFileRepository requestFileRepository;
 
     public void saveFile(Long requestId, String fileName, byte[] fileData) {
-        if (fileData.length > 10 * 1024 * 1024) { // 10 MB limit
+        if (fileData.length > 10 * 1024 * 1024) {
             throw new IllegalArgumentException("Dosya boyutu 10 MB'ı aşamaz.");
         }
 

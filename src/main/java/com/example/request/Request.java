@@ -1,5 +1,4 @@
-// model/Request.java
-package com.example.model;
+package com.example.request;
 
 import com.example.enums.RequestStatus;
 import com.example.enums.YoneticiTakdiri;

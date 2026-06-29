@@ -1,11 +1,8 @@
-// service/RequestService.java
-package com.example.service;
+package com.example.request;
 
 import com.example.enums.RequestStatus;
 import com.example.enums.YoneticiTakdiri;
-import com.example.model.Request;
-import com.example.repository.RequestRepository;
-import com.example.repository.RequestRepository.CredibilityStats;
+import com.example.request.RequestRepository.CredibilityStats;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +24,6 @@ public class RequestService {
             throw new IllegalArgumentException("Talep detayı boş bırakılamaz.");
         }
 
-        // BR07: status her zaman NEW başlar
         request.setStatus(RequestStatus.NEW);
 
         requestRepository.save(request);
@@ -74,9 +70,11 @@ public class RequestService {
 
         requestRepository.reject(requestId, rejectionReason);
     }
+
     public Optional<Long> findLastRequestIdByCustomer(Long customerId) {
-    return requestRepository.findLastRequestIdByCustomer(customerId);
-}
+        return requestRepository.findLastRequestIdByCustomer(customerId);
+    }
+
     public void markAsPrioritized(Long requestId) {
         Request request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Talep bulunamadı."));

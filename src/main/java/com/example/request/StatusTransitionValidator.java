@@ -1,5 +1,4 @@
-// service/StatusTransitionValidator.java
-package com.example.service;
+package com.example.request;
 
 import com.example.enums.RequestStatus;
 import com.example.enums.WorkflowStatus;

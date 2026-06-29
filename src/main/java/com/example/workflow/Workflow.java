@@ -1,5 +1,4 @@
-// model/Workflow.java
-package com.example.model;
+package com.example.workflow;
 
 import com.example.enums.WorkflowStatus;
 import lombok.Data;

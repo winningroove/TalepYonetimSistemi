@@ -1,5 +1,4 @@
-// model/User.java
-package com.example.model;
+package com.example.user;
 
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;

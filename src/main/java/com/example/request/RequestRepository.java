@@ -1,9 +1,7 @@
-// repository/RequestRepository.java
-package com.example.repository;
+package com.example.request;
 
 import com.example.enums.RequestStatus;
 import com.example.enums.YoneticiTakdiri;
-import com.example.model.Request;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -21,20 +19,20 @@ public class RequestRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-  private final RowMapper<Request> rowMapper = (rs, rowNum) -> {
-    Request request = new Request();
-    request.setRequestId(rs.getLong(1));
-    request.setCustomerId(rs.getLong(2));
-    request.setTitle(rs.getString(3));
-    request.setDescription(rs.getString(4));
-    request.setStatus(RequestStatus.valueOf(rs.getString(5)));
-    request.setRejectionReason(rs.getString(6));
-    String takdiri = rs.getString(7);
-    request.setYoneticiTakdiri(takdiri != null ? YoneticiTakdiri.valueOf(takdiri) : YoneticiTakdiri.YOK);
-    request.setCreatedAt(rs.getTimestamp(8).toLocalDateTime());
-    request.setUpdatedAt(rs.getTimestamp(9).toLocalDateTime());
-    return request;
-};
+    private final RowMapper<Request> rowMapper = (rs, rowNum) -> {
+        Request request = new Request();
+        request.setRequestId(rs.getLong(1));
+        request.setCustomerId(rs.getLong(2));
+        request.setTitle(rs.getString(3));
+        request.setDescription(rs.getString(4));
+        request.setStatus(RequestStatus.valueOf(rs.getString(5)));
+        request.setRejectionReason(rs.getString(6));
+        String takdiri = rs.getString(7);
+        request.setYoneticiTakdiri(takdiri != null ? YoneticiTakdiri.valueOf(takdiri) : YoneticiTakdiri.YOK);
+        request.setCreatedAt(rs.getTimestamp(8).toLocalDateTime());
+        request.setUpdatedAt(rs.getTimestamp(9).toLocalDateTime());
+        return request;
+    };
 
     public Optional<Request> findById(Long requestId) {
         String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests WHERE request_id = ?";
@@ -69,19 +67,19 @@ public class RequestRepository {
     }
 
     public Optional<Long> findLastRequestIdByCustomer(Long customerId) {
-    String sql = """
-        SELECT request_id FROM Eren_requests
-        WHERE customer_id = ?
-        ORDER BY created_at DESC
-        FETCH FIRST 1 ROWS ONLY
-        """;
-    try {
-        return Optional.ofNullable(
-            jdbcTemplate.queryForObject(sql, Long.class, customerId));
-    } catch (EmptyResultDataAccessException e) {
-        return Optional.empty();
+        String sql = """
+            SELECT request_id FROM Eren_requests
+            WHERE customer_id = ?
+            ORDER BY created_at DESC
+            FETCH FIRST 1 ROWS ONLY
+            """;
+        try {
+            return Optional.ofNullable(
+                jdbcTemplate.queryForObject(sql, Long.class, customerId));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
-}
 
     public void save(Request request) {
         String sql = """
@@ -124,7 +122,6 @@ public class RequestRepository {
         jdbcTemplate.update(sql, takdir.name(), requestId);
     }
 
-    
     public CredibilityStats getCredibilityStats(Long customerId) {
         String sql = """
             SELECT

@@ -1,7 +1,5 @@
-// repository/RequestFileRepository.java
-package com.example.repository;
+package com.example.request;
 
-import com.example.model.RequestFile;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

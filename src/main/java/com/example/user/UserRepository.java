@@ -1,9 +1,7 @@
-// repository/UserRepository.java
-package com.example.repository;
+package com.example.user;
 
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
-import com.example.model.User;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

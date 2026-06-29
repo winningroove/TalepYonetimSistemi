@@ -1,8 +1,6 @@
-// repository/WorkflowRepository.java
-package com.example.repository;
+package com.example.workflow;
 
 import com.example.enums.WorkflowStatus;
-import com.example.model.Workflow;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -53,13 +51,13 @@ public class WorkflowRepository {
     }
 
     public Optional<Workflow> findByTaskId(Long taskId) {
-    String sql = "SELECT * FROM Eren_workflows WHERE task_id = ?";
-    try {
-        return Optional.ofNullable(jdbcTemplate.queryForObject(sql, rowMapper, taskId));
-    } catch (EmptyResultDataAccessException e) {
-        return Optional.empty();
+        String sql = "SELECT * FROM Eren_workflows WHERE task_id = ?";
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(sql, rowMapper, taskId));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
     }
-}
 
     public List<Workflow> findUnassigned() {
         String sql = """
@@ -89,34 +87,35 @@ public class WorkflowRepository {
         return jdbcTemplate.update(sql, newStatus.name(), taskId, currentVersion);
     }
 
-  public int assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
-    String sql = """
-        UPDATE Eren_workflows
-        SET developer_id = ?, version = version + 1, updated_at = SYSTIMESTAMP
-        WHERE task_id = ? AND version = ?
-        """;
-    return jdbcTemplate.update(sql, developerId, taskId, currentVersion);
-}
+    public int assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
+        String sql = """
+            UPDATE Eren_workflows
+            SET developer_id = ?, version = version + 1, updated_at = SYSTIMESTAMP
+            WHERE task_id = ? AND version = ?
+            """;
+        return jdbcTemplate.update(sql, developerId, taskId, currentVersion);
+    }
 
     public List<Workflow> findDoneByDeveloperId(Long developerId) {
-    String sql = """
-        SELECT * FROM Eren_workflows
-        WHERE developer_id = ? AND workflow_status = 'DONE'
-        ORDER BY updated_at DESC
-        """;
-    return jdbcTemplate.query(sql, rowMapper, developerId);
-}
-public List<Workflow> findAllActive() {
-    String sql = """
-        SELECT * FROM Eren_workflows
-        WHERE workflow_status != 'DONE'
-        ORDER BY created_at ASC
-        """;
-    return jdbcTemplate.query(sql, rowMapper);
-}
+        String sql = """
+            SELECT * FROM Eren_workflows
+            WHERE developer_id = ? AND workflow_status = 'DONE'
+            ORDER BY updated_at DESC
+            """;
+        return jdbcTemplate.query(sql, rowMapper, developerId);
+    }
 
-public List<Workflow> findAll() {
-    String sql = "SELECT * FROM Eren_workflows ORDER BY created_at DESC";
-    return jdbcTemplate.query(sql, rowMapper);
-}
+    public List<Workflow> findAllActive() {
+        String sql = """
+            SELECT * FROM Eren_workflows
+            WHERE workflow_status != 'DONE'
+            ORDER BY created_at ASC
+            """;
+        return jdbcTemplate.query(sql, rowMapper);
+    }
+
+    public List<Workflow> findAll() {
+        String sql = "SELECT * FROM Eren_workflows ORDER BY created_at DESC";
+        return jdbcTemplate.query(sql, rowMapper);
+    }
 }

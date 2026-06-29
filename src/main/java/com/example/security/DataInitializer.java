@@ -3,8 +3,8 @@ package com.example.security;
 
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
-import com.example.model.User;
-import com.example.service.UserService;
+import com.example.user.User;
+import com.example.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

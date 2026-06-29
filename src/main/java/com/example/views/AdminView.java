@@ -2,8 +2,8 @@ package com.example.views;
 
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
-import com.example.model.User;
-import com.example.service.UserService;
+import com.example.user.User;
+import com.example.user.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;

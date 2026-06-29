@@ -1,14 +1,14 @@
 package com.example.views;
 
 import com.example.enums.WorkflowStatus;
-import com.example.model.Request;
-import com.example.model.RequestFile;
-import com.example.model.Workflow;
-import com.example.service.PrioritizationService;
-import com.example.service.RequestFileService;
-import com.example.service.RequestService;
-import com.example.service.UserService;
-import com.example.service.WorkflowService;
+import com.example.prioritization.PrioritizationService;
+import com.example.request.Request;
+import com.example.request.RequestFile;
+import com.example.request.RequestFileService;
+import com.example.request.RequestService;
+import com.example.user.UserService;
+import com.example.workflow.Workflow;
+import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;

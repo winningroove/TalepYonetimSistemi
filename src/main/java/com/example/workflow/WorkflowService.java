@@ -1,9 +1,7 @@
-// service/WorkflowService.java
-package com.example.service;
+package com.example.workflow;
 
 import com.example.enums.WorkflowStatus;
-import com.example.model.Workflow;
-import com.example.repository.WorkflowRepository;
+import com.example.request.StatusTransitionValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -48,36 +46,39 @@ public class WorkflowService {
             throw new IllegalStateException("Bu görev başkası tarafından üstlenildi. Sayfayı yenileyin.");
         }
     }
-public List<Workflow> getDoneWorkflowsByDeveloper(Long developerId) {
-    return workflowRepository.findDoneByDeveloperId(developerId);
-}
-public void updateStatus(Long taskId, WorkflowStatus newStatus, int currentVersion) {
-    Workflow workflow = workflowRepository.findByTaskId(taskId)
-            .orElseThrow(() -> new IllegalArgumentException("Görev bulunamadı."));
 
-    if (!transitionValidator.isValidWorkflowTransition(workflow.getWorkflowStatus(), newStatus)) {
-        throw new IllegalStateException(
-            "Geçersiz durum geçişi: " + workflow.getWorkflowStatus() + " → " + newStatus
-        );
+    public List<Workflow> getDoneWorkflowsByDeveloper(Long developerId) {
+        return workflowRepository.findDoneByDeveloperId(developerId);
     }
 
-    int updated = workflowRepository.updateStatus(taskId, newStatus, currentVersion);
-    if (updated == 0) {
-        throw new IllegalStateException("Görev başkası tarafından güncellendi. Sayfayı yenileyin.");
-    }
-}
-public List<Workflow> getAllActiveWorkflows() {
-    return workflowRepository.findAllActive();
-}
+    public void updateStatus(Long taskId, WorkflowStatus newStatus, int currentVersion) {
+        Workflow workflow = workflowRepository.findByTaskId(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Görev bulunamadı."));
 
-public List<Workflow> getAllWorkflows() {
-    return workflowRepository.findAll();
-}
+        if (!transitionValidator.isValidWorkflowTransition(workflow.getWorkflowStatus(), newStatus)) {
+            throw new IllegalStateException(
+                "Geçersiz durum geçişi: " + workflow.getWorkflowStatus() + " → " + newStatus
+            );
+        }
 
-public void assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
-    int updated = workflowRepository.assignDeveloperBySM(taskId, developerId, currentVersion);
-    if (updated == 0) {
-        throw new IllegalStateException("Görev zaten atanmış veya başkası güncelledi.");
+        int updated = workflowRepository.updateStatus(taskId, newStatus, currentVersion);
+        if (updated == 0) {
+            throw new IllegalStateException("Görev başkası tarafından güncellendi. Sayfayı yenileyin.");
+        }
     }
-}
+
+    public List<Workflow> getAllActiveWorkflows() {
+        return workflowRepository.findAllActive();
+    }
+
+    public List<Workflow> getAllWorkflows() {
+        return workflowRepository.findAll();
+    }
+
+    public void assignDeveloperBySM(Long taskId, Long developerId, int currentVersion) {
+        int updated = workflowRepository.assignDeveloperBySM(taskId, developerId, currentVersion);
+        if (updated == 0) {
+            throw new IllegalStateException("Görev zaten atanmış veya başkası güncelledi.");
+        }
+    }
 }

@@ -1,8 +1,15 @@
 package com.example.views;
 
 import com.example.enums.*;
-import com.example.model.*;
-import com.example.service.*;
+import com.example.prioritization.Prioritization;
+import com.example.prioritization.PrioritizationService;
+import com.example.request.Request;
+import com.example.request.RequestFile;
+import com.example.request.RequestFileService;
+import com.example.request.RequestService;
+import com.example.user.User;
+import com.example.user.UserService;
+import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;

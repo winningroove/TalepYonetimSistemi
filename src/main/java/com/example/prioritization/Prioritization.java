@@ -1,5 +1,4 @@
-// model/Prioritization.java
-package com.example.model;
+package com.example.prioritization;
 
 import com.example.enums.GelistiriciMudahalesi;
 import com.example.enums.IsTipi;

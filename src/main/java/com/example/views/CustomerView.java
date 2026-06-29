@@ -2,13 +2,12 @@ package com.example.views;
 
 import com.example.enums.RequestStatus;
 import com.example.enums.WorkflowStatus;
-import com.example.model.Request;
-import com.example.model.RequestFile;
-import com.example.model.User;
-import com.example.service.RequestFileService;
-import com.example.service.RequestService;
-import com.example.service.UserService;
-import com.example.service.WorkflowService;
+import com.example.request.Request;
+import com.example.request.RequestFile;
+import com.example.request.RequestFileService;
+import com.example.request.RequestService;
+import com.example.user.UserService;
+import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -24,10 +23,6 @@ import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
-import com.example.model.RequestFile;
-import com.example.service.RequestFileService;
-import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 
 import java.util.List;
 
@@ -302,9 +297,18 @@ private String formatFileSize(Long bytes) {
     return (bytes / (1024 * 1024)) + " MB";
 }
 
+    private String durumLabel(RequestStatus status) {
+        return switch (status) {
+            case NEW          -> "Yeni";
+            case UNDER_REVIEW -> "İncelemede";
+            case PRIORITIZED  -> "Önceliklendirildi";
+            case REJECTED     -> "Reddedildi";
+        };
+    }
+
     private Span durumBadge(RequestStatus status) {
-        Span badge = new Span(status.name());
-        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px");
+        Span badge = new Span(durumLabel(status));
+        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px").set("font-weight", "bold");
         switch (status) {
             case NEW          -> badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
             case UNDER_REVIEW -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
@@ -314,8 +318,6 @@ private String formatFileSize(Long bytes) {
         return badge;
     }
 
-    // İş akışı tamamlandıysa (workflow DONE) talep "TAMAMLANDI" olarak gösterilir;
-    // request.status veritabanında PRIORITIZED olarak kalır.
     private boolean isTamamlandi(Request r) {
         return r.getStatus() == RequestStatus.PRIORITIZED
             && workflowService.findByRequestId(r.getRequestId())
@@ -324,12 +326,12 @@ private String formatFileSize(Long bytes) {
     }
 
     private String durumMetni(Request r) {
-        return isTamamlandi(r) ? "TAMAMLANDI" : r.getStatus().name();
+        return isTamamlandi(r) ? "Tamamlandı" : durumLabel(r.getStatus());
     }
 
     private Span durumBadgeFor(Request r) {
         if (isTamamlandi(r)) {
-            Span badge = new Span("TAMAMLANDI");
+            Span badge = new Span("Tamamlandı");
             badge.getStyle()
                 .set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px")
                 .set("background", "#d4edda").set("color", "#155724").set("font-weight", "bold");

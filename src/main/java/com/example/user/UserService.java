@@ -1,9 +1,6 @@
-// service/UserService.java
-package com.example.service;
+package com.example.user;
 
 import com.example.enums.Role;
-import com.example.model.User;
-import com.example.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -71,6 +68,6 @@ public class UserService {
     }
 
     public List<User> findAll() {
-    return userRepository.findAll();
-}
+        return userRepository.findAll();
+    }
 }

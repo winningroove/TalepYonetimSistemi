@@ -1,7 +1,7 @@
 package com.example.security;
 
-import com.example.model.User;
-import com.example.repository.UserRepository;
+import com.example.user.User;
+import com.example.user.UserRepository;
 import com.example.views.LoginView;
 import com.vaadin.flow.spring.security.VaadinSecurityConfigurer;
 import org.springframework.context.annotation.Bean;
