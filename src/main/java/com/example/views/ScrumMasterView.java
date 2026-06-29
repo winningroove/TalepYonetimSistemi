@@ -79,9 +79,9 @@ public ScrumMasterView(WorkflowService workflowService,
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button sprintBtn      = menuButton("• Sprint Board");
-        Button atanmamisBtn   = menuButton("• Atanmamış Görevler");
-        Button tamamlananBtn  = menuButton("• Tamamlanan Görevler");
+        Button sprintBtn      = menuButton("Sprint Board");
+        Button atanmamisBtn   = menuButton("Atanmamış Görevler");
+        Button tamamlananBtn  = menuButton("Tamamlanan Görevler");
 
         sprintBtn.addClickListener(e -> showSprintBoard());
         atanmamisBtn.addClickListener(e -> showAtanmamisGorevler());
@@ -111,12 +111,21 @@ public ScrumMasterView(WorkflowService workflowService,
         Button btn = new Button(text);
         btn.getStyle()
             .set("color", "white")
-            .set("background", "transparent")
+            .set("background", "rgba(255,255,255,0.07)")
             .set("border", "none")
+            .set("border-left", "3px solid rgba(255,255,255,0.2)")
+            .set("border-radius", "6px")
             .set("text-align", "left")
             .set("width", "100%")
             .set("cursor", "pointer")
-            .set("padding", "8px 0");
+            .set("padding", "10px 14px")
+            .set("margin-bottom", "4px")
+            .set("font-size", "13px")
+            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
+        btn.getElement().addEventListener("mouseover", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+        btn.getElement().addEventListener("mouseout", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
     }
 
@@ -151,11 +160,14 @@ public ScrumMasterView(WorkflowService workflowService,
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
         grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
+            boolean atanmamis = w.getDeveloperId() == null;
             Button ataBtn = new Button(
-                w.getDeveloperId() == null ? "Geliştirici Ata" : "Yeniden Ata",
+                atanmamis ? "Geliştirici Ata" : "Yeniden Ata",
                 e -> atamaDiyaloguAc(w)
             );
-            ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            ataBtn.getStyle()
+                .set("background-color", atanmamis ? "#1B6EC2" : "#B45309")
+                .set("color", "white");
             return ataBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();

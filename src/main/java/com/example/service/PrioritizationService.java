@@ -79,8 +79,8 @@ public class PrioritizationService {
      * Sonuç her durumda 0-100 aralığına sıkıştırılır.
      */
     public int calculateFinalScore(Prioritization p, YoneticiTakdiri takdir, int credibilityScore) {
-        double bazSkor      = calculateBazSkor(p);
-        int    takdirPuan   = (takdir != null ? takdir.getPuan() : 0);
+        double bazSkor       = calculateBazSkor(p);
+        int    takdirPuan    = (takdir != null ? takdir.getPuan() : 0);
         int    cabaDuzeltici = (p.getGelistiriciMudahalesi() != null
                 ? p.getGelistiriciMudahalesi().getDuzeltici()
                 : 0);

@@ -82,14 +82,14 @@ public class DeveloperView extends HorizontalLayout {
         Span altBaslik = new Span("Geliştirici Paneli");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
-        H5 menuBaslik = new H5("Menu");
+        H5 menuBaslik = new H5("Menü");
         menuBaslik.getStyle()
             .set("color", "#aaaaaa")
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button gorevlerimBtn = menuButton("• Gorevlerim");
-        Button tamamlananBtn = menuButton("• Tamamlanan Gorevler");
+        Button gorevlerimBtn = menuButton("Görevlerim");
+        Button tamamlananBtn = menuButton("Tamamlanan Görevler");
 
         gorevlerimBtn.addClickListener(e -> showGorevlerim());
         tamamlananBtn.addClickListener(e -> showTamamlananlar());
@@ -101,10 +101,10 @@ public class DeveloperView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giris Yapan:");
+        Span girisYapan = new Span("Giriş Yapan:");
         girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
 
-        Span kullaniciAdi = new Span(currentUserName + " (Gelistirici)");
+        Span kullaniciAdi = new Span(currentUserName + " (Geliştirici)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
         sidebar.add(baslik, altBaslik, menuBaslik, gorevlerimBtn, tamamlananBtn);
@@ -118,12 +118,21 @@ public class DeveloperView extends HorizontalLayout {
         Button btn = new Button(text);
         btn.getStyle()
             .set("color", "white")
-            .set("background", "transparent")
+            .set("background", "rgba(255,255,255,0.07)")
             .set("border", "none")
+            .set("border-left", "3px solid rgba(255,255,255,0.2)")
+            .set("border-radius", "6px")
             .set("text-align", "left")
             .set("width", "100%")
             .set("cursor", "pointer")
-            .set("padding", "8px 0");
+            .set("padding", "10px 14px")
+            .set("margin-bottom", "4px")
+            .set("font-size", "13px")
+            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
+        btn.getElement().addEventListener("mouseover", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+        btn.getElement().addEventListener("mouseout", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
     }
 
@@ -148,8 +157,8 @@ public class DeveloperView extends HorizontalLayout {
    private void showGorevlerim() {
     mainContent.removeAll();
 
-    H2 baslik = new H2("Gorevlerim");
-    Paragraph aciklama = new Paragraph("Size atanan aktif gorevler. En yuksek oncelikli gorevler ustte listelenir.");
+    H2 baslik = new H2("Görevlerim");
+    Paragraph aciklama = new Paragraph("Size atanan aktif görevler. En yüksek öncelikli görevler üstte listelenir.");
 
     Grid<Workflow> grid = new Grid<>(Workflow.class, false);
     grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
@@ -158,7 +167,7 @@ public class DeveloperView extends HorizontalLayout {
         return prioritizationService.findByRequestId(w.getRequestId())
             .map(p -> {
                 if (p.getGelistiriciMudahalesi() == null) {
-                    Span badge = new Span("Hesaplanmadi");
+                    Span badge = new Span("Hesaplanmadı");
                     badge.getStyle()
                         .set("padding", "4px 8px")
                         .set("border-radius", "4px")
@@ -169,10 +178,10 @@ public class DeveloperView extends HorizontalLayout {
                 int skor = p.getPriorityScore();
                 String label = switch (skor / 20) {
                     case 4  -> "Kritik";
-                    case 3  -> "Yuksek";
+                    case 3  -> "Yüksek";
                     case 2  -> "Orta";
-                    case 1  -> "Dusuk";
-                    default -> skor >= 81 ? "Kritik" : "Cok Dusuk";
+                    case 1  -> "Düşük";
+                    default -> skor >= 81 ? "Kritik" : "Çok Düşük";
                 };
                 Span badge = new Span(skor + " (" + label + ")");
                 badge.getStyle()
@@ -190,8 +199,8 @@ public class DeveloperView extends HorizontalLayout {
                 badge.getStyle().set("color", "#888");
                 return badge;
             });
-    }).setHeader("Oncelik");
-    grid.addComponentColumn(this::durumGuncelleButonu).setHeader("Islem");
+    }).setHeader("Öncelik");
+    grid.addComponentColumn(this::durumGuncelleButonu).setHeader("İşlem");
     grid.addComponentColumn(w -> {
         Button detayBtn = new Button("Detay", e -> gorevDetayDialogAc(w));
         detayBtn.getStyle().set("background-color", "#2C6FAC").set("color", "white");
@@ -218,13 +227,13 @@ public class DeveloperView extends HorizontalLayout {
     private void showTamamlananlar() {
         mainContent.removeAll();
 
-        H2 baslik = new H2("Tamamlanan Gorevler");
-        Paragraph aciklama = new Paragraph("Tamamladiginiz gorevlerin listesi.");
+        H2 baslik = new H2("Tamamlanan Görevler");
+        Paragraph aciklama = new Paragraph("Tamamladığınız görevlerin listesi.");
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
         grid.addComponentColumn(w -> {
-            Span done = new Span("Tamamlandi");
+            Span done = new Span("Tamamlandı");
             done.getStyle().set("color", "green").set("font-weight", "bold");
             return done;
         }).setHeader("Durum");
@@ -249,14 +258,24 @@ public class DeveloperView extends HorizontalLayout {
     };
 
     if (next == null) {
-        return new Button("Tamamlandi");
+        Button done = new Button("✓ Tamamlandı");
+        done.getStyle().set("background-color", "#155724").set("color", "white").set("cursor", "default");
+        done.setEnabled(false);
+        return done;
     }
 
     String butonText = switch (next) {
-        case IN_PROGRESS -> "Basla";
-        case TESTING     -> "Teste Gonder";
-        case DONE        -> "Tamamla";
+        case IN_PROGRESS -> "▶ Başla";
+        case TESTING     -> "🧪 Teste Gönder";
+        case DONE        -> "✔ Tamamla";
         default          -> "";
+    };
+
+    String bgColor = switch (next) {
+        case IN_PROGRESS -> "#1B6EC2";
+        case TESTING     -> "#B45309";
+        case DONE        -> "#166534";
+        default          -> "#1B2A3B";
     };
 
     Button btn = new Button(butonText, e -> {
@@ -267,7 +286,7 @@ public class DeveloperView extends HorizontalLayout {
             Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
         }
     });
-    btn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+    btn.getStyle().set("background-color", bgColor).set("color", "white");
     return btn;
 }
     
@@ -276,13 +295,13 @@ public class DeveloperView extends HorizontalLayout {
         Dialog dialog = new Dialog();
 
         requestService.findById(workflow.getRequestId()).ifPresent(request -> {
-            dialog.setHeaderTitle("Gorev Detayi — " + request.getTitle());
+            dialog.setHeaderTitle("Görev Detayı — " + request.getTitle());
 
             VerticalLayout icerik = new VerticalLayout();
             icerik.setPadding(false);
 
-            icerik.add(new Span("Talep Basligi: " + request.getTitle()));
-            icerik.add(new Span("Aciklama: " + request.getDescription()));
+            icerik.add(new Span("Talep Başlığı: " + request.getTitle()));
+            icerik.add(new Span("Açıklama: " + request.getDescription()));
             icerik.add(new Span("Durum: " + workflow.getWorkflowStatus()));
             icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
 

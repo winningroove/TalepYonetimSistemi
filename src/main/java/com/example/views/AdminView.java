@@ -69,7 +69,7 @@ public class AdminView extends HorizontalLayout {
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button kullanicilarBtn = menuButton("• Kullanıcı Yönetimi");
+        Button kullanicilarBtn = menuButton("Kullanıcı Yönetimi");
         kullanicilarBtn.addClickListener(e -> showKullanicilar());
 
         Div divider = new Div();
@@ -96,12 +96,21 @@ public class AdminView extends HorizontalLayout {
         Button btn = new Button(text);
         btn.getStyle()
             .set("color", "white")
-            .set("background", "transparent")
+            .set("background", "rgba(255,255,255,0.07)")
             .set("border", "none")
+            .set("border-left", "3px solid rgba(255,255,255,0.2)")
+            .set("border-radius", "6px")
             .set("text-align", "left")
             .set("width", "100%")
             .set("cursor", "pointer")
-            .set("padding", "8px 0");
+            .set("padding", "10px 14px")
+            .set("margin-bottom", "4px")
+            .set("font-size", "13px")
+            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
+        btn.getElement().addEventListener("mouseover", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+        btn.getElement().addEventListener("mouseout", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
     }
 

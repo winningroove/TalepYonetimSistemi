@@ -21,25 +21,23 @@ public class RequestRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    private final RowMapper<Request> rowMapper = (rs, rowNum) -> {
-        Request request = new Request();
-        request.setRequestId(rs.getLong("request_id"));
-        request.setCustomerId(rs.getLong("customer_id"));
-        request.setTitle(rs.getString("title"));
-        request.setDescription(rs.getString("description"));
-        request.setStatus(RequestStatus.valueOf(rs.getString("status")));
-        request.setRejectionReason(rs.getString("rejection_reason"));
-        String takdiri = rs.getString("yonetici_takdiri");
-        request.setYoneticiTakdiri(takdiri != null
-                ? YoneticiTakdiri.valueOf(takdiri)
-                : YoneticiTakdiri.YOK);
-        request.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        request.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
-        return request;
-    };
+  private final RowMapper<Request> rowMapper = (rs, rowNum) -> {
+    Request request = new Request();
+    request.setRequestId(rs.getLong(1));
+    request.setCustomerId(rs.getLong(2));
+    request.setTitle(rs.getString(3));
+    request.setDescription(rs.getString(4));
+    request.setStatus(RequestStatus.valueOf(rs.getString(5)));
+    request.setRejectionReason(rs.getString(6));
+    String takdiri = rs.getString(7);
+    request.setYoneticiTakdiri(takdiri != null ? YoneticiTakdiri.valueOf(takdiri) : YoneticiTakdiri.YOK);
+    request.setCreatedAt(rs.getTimestamp(8).toLocalDateTime());
+    request.setUpdatedAt(rs.getTimestamp(9).toLocalDateTime());
+    return request;
+};
 
     public Optional<Request> findById(Long requestId) {
-        String sql = "SELECT * FROM Eren_requests WHERE request_id = ?";
+        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests WHERE request_id = ?";
         try {
             return Optional.ofNullable(jdbcTemplate.queryForObject(sql, rowMapper, requestId));
         } catch (EmptyResultDataAccessException e) {
@@ -49,7 +47,7 @@ public class RequestRepository {
 
     public List<Request> findByCustomerId(Long customerId) {
         String sql = """
-            SELECT * FROM Eren_requests
+            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests
             WHERE customer_id = ?
             ORDER BY created_at DESC
             """;
@@ -58,7 +56,7 @@ public class RequestRepository {
 
     public List<Request> findAllActive() {
         String sql = """
-            SELECT * FROM Eren_requests
+            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests
             WHERE status != 'REJECTED'
             ORDER BY created_at ASC
             """;
@@ -66,7 +64,7 @@ public class RequestRepository {
     }
 
     public List<Request> findByStatus(RequestStatus status) {
-        String sql = "SELECT * FROM Eren_requests WHERE status = ? ORDER BY created_at ASC";
+        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests WHERE status = ? ORDER BY created_at ASC";
         return jdbcTemplate.query(sql, rowMapper, status.name());
     }
 
@@ -126,16 +124,7 @@ public class RequestRepository {
         jdbcTemplate.update(sql, takdir.name(), requestId);
     }
 
-    /**
-     * Requester Credibility için ham sayımlar (verilen müşteri/talep sahibi için):
-     *  - total    : toplam talep sayısı
-     *  - rejected : REJECTED statüsündeki talep sayısı
-     *  - approved : onaylanmış / iş akışına alınmış talep sayısı
-     *
-     * Not: BACKLOG/IN_PROGRESS/TESTING/DONE değerleri iş akışı (workflow) statüleridir;
-     * Eren_requests tablosunda iş akışına alınan talep 'PRIORITIZED' olarak kalır.
-     * IN listesi niyeti belgelemek için tam tutulur, pratikte 'PRIORITIZED' eşleşir.
-     */
+    
     public CredibilityStats getCredibilityStats(Long customerId) {
         String sql = """
             SELECT

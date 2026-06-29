@@ -81,9 +81,9 @@ public class POView extends HorizontalLayout {
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button gelenTaleplerBtn = menuButton("• Gelen Talepler");
-        Button oncelikHavuzuBtn = menuButton("• Önceliklendirme Havuzu");
-        Button isAkislariBtn    = menuButton("• İş Akışları (Sprint)");
+        Button gelenTaleplerBtn = menuButton("Gelen Talepler");
+        Button oncelikHavuzuBtn = menuButton("Önceliklendirme Havuzu");
+        Button isAkislariBtn    = menuButton("İş Akışları (Sprint)");
 
         gelenTaleplerBtn.addClickListener(e -> showGelenTalepler());
         oncelikHavuzuBtn.addClickListener(e -> showOnceliklendirmeHavuzu());
@@ -114,12 +114,21 @@ public class POView extends HorizontalLayout {
         Button btn = new Button(text);
         btn.getStyle()
             .set("color", "white")
-            .set("background", "transparent")
+            .set("background", "rgba(255,255,255,0.07)")
             .set("border", "none")
+            .set("border-left", "3px solid rgba(255,255,255,0.2)")
+            .set("border-radius", "6px")
             .set("text-align", "left")
             .set("width", "100%")
             .set("cursor", "pointer")
-            .set("padding", "8px 0");
+            .set("padding", "10px 14px")
+            .set("margin-bottom", "4px")
+            .set("font-size", "13px")
+            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
+        btn.getElement().addEventListener("mouseover", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+        btn.getElement().addEventListener("mouseout", e ->
+            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
     }
 
@@ -211,13 +220,8 @@ public class POView extends HorizontalLayout {
         isAkisiGrid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
         isAkisiGrid.addComponentColumn(r ->
             workflowService.findByRequestId(r.getRequestId())
-                .map(w -> {
-                    Span s = new Span(w.getWorkflowStatus().name());
-                    if (w.getWorkflowStatus() == WorkflowStatus.DONE) {
-                        s.getStyle().set("color", "green").set("font-weight", "bold");
-                    }
-                    return s;
-                }).orElse(new Span("-"))
+                .map(w -> workflowBadge(w.getWorkflowStatus()))
+                .orElse(new Span("-"))
         ).setHeader("Durum");
         isAkisiGrid.setWidthFull();
 
@@ -308,8 +312,7 @@ public class POView extends HorizontalLayout {
                 durumLayout.setPadding(false);
                 durumLayout.setSpacing(false);
 
-                Span durumSpan = new Span("İş Akışında: " + w.getWorkflowStatus());
-                durumLayout.add(durumSpan);
+                durumLayout.add(workflowBadge(w.getWorkflowStatus()));
 
                 if (!cabaGirildi) {
                     Span bekliyor = new Span("⏳ Çaba tahmini bekleniyor");
@@ -376,7 +379,7 @@ public class POView extends HorizontalLayout {
                 credStats.total());
         } else {
             credText = String.format(
-                "Güvenilirlik Skoru: %+d  (Toplam %d • Onaylanan %d • Reddedilen %d)",
+                "Güvenilirlik Skoru: %+d  (Toplam %d Onaylanan %d Reddedilen %d)",
                 credibilityScore, credStats.total(), credStats.approved(), credStats.rejected());
         }
         Span credibilitySpan = new Span(credText);
@@ -439,8 +442,6 @@ public class POView extends HorizontalLayout {
         Span labelSpan = new Span("");
         skorSpan.getStyle().set("font-weight", "bold").set("font-size", "16px");
 
-        // Tahmini skor — gelistirici mudahalesi ORTA varsayılarak gösterilir.
-        // Yönetici takdiri puanı + güvenilirlik skoru da önizlemeye dahil edilir.
         Runnable skorGuncelle = () -> {
             if (isEtkisiBox.getValue() != null && acilyetBox.getValue() != null
                     && isTipiBox.getValue() != null && takdirBox.getValue() != null) {
@@ -453,7 +454,7 @@ public class POView extends HorizontalLayout {
                 temp.setIsTimiPuan(isTipiBox.getValue().getPuan());
                 temp.setBeklemeSuresiPuan(
                     prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
-                temp.setGelistiriciMudahalesi(GelistiriciMudahalesi.ORTA); // varsayılan
+                temp.setGelistiriciMudahalesi(GelistiriciMudahalesi.ORTA);
 
                 int credibility = prioritizationService.calculateCredibilityScore(request.getCustomerId());
                 int skor = prioritizationService.calculateFinalScore(temp, takdirBox.getValue(), credibility);
@@ -480,7 +481,6 @@ public class POView extends HorizontalLayout {
                 p.setAciliyet(acilyetBox.getValue());
                 p.setIsTipi(isTipiBox.getValue());
 
-                // Yönetici takdiri talep üzerinde tutulur
                 requestService.updateYoneticiTakdiri(request.getRequestId(), takdirBox.getValue());
 
                 prioritizationService.savePrioritizationByPO(
@@ -540,11 +540,30 @@ if (!dosyalar.isEmpty()) {
     isEtkisiBox, acilyetBox, isTipiBox,
     takdirBox, skorLayout
 );
-        icerik.setPadding(false);
+            icerik.setPadding(false);
 
         dialog.add(icerik);
         dialog.getFooter().add(iptalBtn, reddetBtn, kaydetBtn);
         dialog.open();
+    }
+
+    private Span workflowBadge(WorkflowStatus status) {
+        String label = switch (status) {
+            case BACKLOG     -> "Backlog";
+            case IN_PROGRESS -> "Devam Ediyor";
+            case TESTING     -> "Test Aşamasında";
+            case DONE        -> "✓ Tamamlandı";
+        };
+        Span badge = new Span(label);
+        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px")
+            .set("font-size", "12px").set("font-weight", "bold");
+        switch (status) {
+            case BACKLOG     -> badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
+            case IN_PROGRESS -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+            case TESTING     -> badge.getStyle().set("background", "#ffe8cc").set("color", "#7d3c00");
+            case DONE        -> badge.getStyle().set("background", "#d4edda").set("color", "#155724");
+        }
+        return badge;
     }
 
     private void reddetDialogAc(Request request) {
@@ -577,17 +596,6 @@ if (!dosyalar.isEmpty()) {
     return (bytes / (1024 * 1024)) + " MB";
 }
 
-    private Span durumBadge(RequestStatus status) {
-        Span badge = new Span(status.name());
-        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px");
-        switch (status) {
-            case NEW          -> badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
-            case UNDER_REVIEW -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
-            case PRIORITIZED  -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
-            case REJECTED     -> badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
-        }
-        return badge;
-    }
 
     private String musteri(Long customerId) {
         return userService.findById(customerId)
