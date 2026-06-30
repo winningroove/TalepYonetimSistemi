@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +23,14 @@ public class PrioritizationService {
     private final RequestService requestService;
     private final UserService userService;
 
+    private final Map<Long, Optional<Prioritization>> byRequestCache = new ConcurrentHashMap<>();
+
     private double calculateBazSkor(Prioritization p) {
         return (
             p.getIsEtkisi()          * 30 +
             p.getAciliyet()          * 25 +
             p.getMusteriDegeriPuan() * 20 +
-            p.getIsTimiPuan()        * 15 +
+            p.getIsTipiPuan()        * 15 +
             p.getBeklemeSuresiPuan() * 10
         ) / 5.0;
     }
@@ -51,7 +55,7 @@ public class PrioritizationService {
         double onaylanmaOrani  = (double) s.approved() / s.total();
 
         if (reddedilmeOrani > 0.70) return -10;
-        if (onaylanmaOrani  > 0.80) return 5;
+        if (onaylanmaOrani  >= 0.80) return 5;
         return 0;
     }
 
@@ -66,9 +70,7 @@ public class PrioritizationService {
         return Math.min(100, Math.max(0, skor));
     }
 
-    // Baz skor matematiksel olarak 20-100 aralığına sıkışır (her faktör 1-5,
-    // alt sınır asla 0 değil), bu yüzden bantlar 0-100 değil gerçek 20-100
-    // aralığına göre kalibre edilmiştir.
+    
     public String getLabel(int score) {
         if (score == 0)  return "İPTAL";
         if (score <= 36) return "ÇOK DÜŞÜK";
@@ -79,13 +81,14 @@ public class PrioritizationService {
     }
 
     public Optional<Prioritization> findByRequestId(Long requestId) {
-        return prioritizationRepository.findByRequestId(requestId);
+        if (requestId == null) return Optional.empty();
+        return byRequestCache.computeIfAbsent(requestId, prioritizationRepository::findByRequestId);
     }
 
     public void savePrioritizationByPO(Prioritization p, Long customerId, LocalDateTime requestCreatedAt) {
         p.setMusteriDegeriPuan(userService.getMusteriDegeriPuan(customerId));
         p.setBeklemeSuresiPuan(calculateBeklemeSuresiPuan(requestCreatedAt));
-        p.setIsTimiPuan(p.getIsTipi().getPuan());
+        p.setIsTipiPuan(p.getIsTipi().getPuan());
 
         p.setBazSkor(0);
         p.setPriorityScore(0);
@@ -98,6 +101,7 @@ public class PrioritizationService {
         }
 
         requestService.markAsPrioritized(p.getRequestId());
+        byRequestCache.clear();
     }
 
     public void updateGelistiriciMudahalesi(Long requestId, GelistiriciMudahalesi gelistiriciMudahalesi) {
@@ -115,5 +119,6 @@ public class PrioritizationService {
         p.setPriorityScore(calculateFinalScore(p, request.getYoneticiTakdiri(), credibility));
 
         prioritizationRepository.update(p);
+        byRequestCache.clear();
     }
 }

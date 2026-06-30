@@ -27,7 +27,7 @@ public class PrioritizationRepository {
         p.setAciliyet(rs.getInt("aciliyet"));
         p.setMusteriDegeriPuan(rs.getInt("musteri_degeri_puan"));
         p.setIsTipi(IsTipi.valueOf(rs.getString("is_tipi")));
-        p.setIsTimiPuan(rs.getInt("is_tipi_puan"));
+        p.setIsTipiPuan(rs.getInt("is_tipi_puan"));
         p.setBeklemeSuresiPuan(rs.getInt("bekleme_suresi_puan"));
         p.setGelistiriciMudahalesi(rs.getString("gelistirici_mudahalesi") != null
                 ? GelistiriciMudahalesi.valueOf(rs.getString("gelistirici_mudahalesi"))
@@ -68,7 +68,7 @@ public class PrioritizationRepository {
                 p.getAciliyet(),
                 p.getMusteriDegeriPuan(),
                 p.getIsTipi().name(),
-                p.getIsTimiPuan(),
+                p.getIsTipiPuan(),
                 p.getBeklemeSuresiPuan(),
                 p.getGelistiriciMudahalesi() != null ? p.getGelistiriciMudahalesi().name() : null,
                 p.getBazSkor(),
@@ -90,7 +90,7 @@ public class PrioritizationRepository {
                 p.getAciliyet(),
                 p.getMusteriDegeriPuan(),
                 p.getIsTipi().name(),
-                p.getIsTimiPuan(),
+                p.getIsTipiPuan(),
                 p.getBeklemeSuresiPuan(),
                 p.getGelistiriciMudahalesi() != null ? p.getGelistiriciMudahalesi().name() : null,
                 p.getBazSkor(),

@@ -650,7 +650,7 @@ public class POView extends HorizontalLayout {
                 temp.setAciliyet(acilyetBox.getValue());
                 temp.setMusteriDegeriPuan(musteriDegeriPuan);
                 temp.setIsTipi(isTipiBox.getValue());
-                temp.setIsTimiPuan(isTipiBox.getValue().getPuan());
+                temp.setIsTipiPuan(isTipiBox.getValue().getPuan());
                 temp.setBeklemeSuresiPuan(
                     prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
                 temp.setGelistiriciMudahalesi(GelistiriciMudahalesi.ORTA);

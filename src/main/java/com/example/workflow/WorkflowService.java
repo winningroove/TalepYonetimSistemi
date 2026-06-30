@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -14,6 +16,10 @@ public class WorkflowService {
 
     private final WorkflowRepository workflowRepository;
     private final StatusTransitionValidator transitionValidator;
+
+    /** requestId -> iş akışı önbelleği. Grid'lerde satır başına çağrıldığı için.
+     *  Yoklukları da (Optional.empty) saklar; her yazma işlemi temizler. */
+    private final Map<Long, Optional<Workflow>> byRequestCache = new ConcurrentHashMap<>();
 
     public List<Workflow> getDeveloperWorkflows(Long developerId) {
         return workflowRepository.findByDeveloperId(developerId);
@@ -24,7 +30,8 @@ public class WorkflowService {
     }
 
     public Optional<Workflow> findByRequestId(Long requestId) {
-        return workflowRepository.findByRequestId(requestId);
+        if (requestId == null) return Optional.empty();
+        return byRequestCache.computeIfAbsent(requestId, workflowRepository::findByRequestId);
     }
 
     public void createWorkflow(Long requestId) {
@@ -38,13 +45,7 @@ public class WorkflowService {
         workflow.setVersion(0);
 
         workflowRepository.save(workflow);
-    }
-
-    public void assignDeveloper(Long taskId, Long developerId, int currentVersion) {
-        int updated = workflowRepository.assignDeveloperBySM(taskId, developerId, currentVersion);
-        if (updated == 0) {
-            throw new IllegalStateException("Bu görev başkası tarafından üstlenildi. Sayfayı yenileyin.");
-        }
+        byRequestCache.clear();
     }
 
     public List<Workflow> getDoneWorkflowsByDeveloper(Long developerId) {
@@ -65,6 +66,7 @@ public class WorkflowService {
         if (updated == 0) {
             throw new IllegalStateException("Görev başkası tarafından güncellendi. Sayfayı yenileyin.");
         }
+        byRequestCache.clear();
     }
 
     public List<Workflow> getAllActiveWorkflows() {
@@ -80,5 +82,6 @@ public class WorkflowService {
         if (updated == 0) {
             throw new IllegalStateException("Görev zaten atanmış veya başkası güncelledi.");
         }
+        byRequestCache.clear();
     }
 }

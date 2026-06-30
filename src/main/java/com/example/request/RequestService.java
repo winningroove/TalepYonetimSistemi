@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +20,11 @@ public class RequestService {
     private final RequestRepository requestRepository;
     private final StatusTransitionValidator transitionValidator;
     private final UserService userService;
+
+    /** requestId -> talep önbelleği (SM/Geliştirici grid'lerinde talep adı/tarih çözümü için).
+     *  Yazma metotları kendi doğrulamalarında repository'yi doğrudan kullanır; bu önbellek
+     *  yalnızca görüntüleme okumalarını hızlandırır ve her yazmada temizlenir. */
+    private final Map<Long, Optional<Request>> idCache = new ConcurrentHashMap<>();
 
     public void createRequest(Request request) {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
@@ -30,6 +37,7 @@ public class RequestService {
         request.setStatus(RequestStatus.NEW);
 
         requestRepository.save(request);
+        idCache.clear();
     }
 
     public List<Request> getCustomerRequests(Long customerId) {
@@ -37,7 +45,8 @@ public class RequestService {
     }
 
     public Optional<Request> findById(Long requestId) {
-        return requestRepository.findById(requestId);
+        if (requestId == null) return Optional.empty();
+        return idCache.computeIfAbsent(requestId, requestRepository::findById);
     }
 
     public List<Request> getAllActiveRequests() {
@@ -57,6 +66,7 @@ public class RequestService {
         }
 
         requestRepository.updateStatus(requestId, RequestStatus.UNDER_REVIEW);
+        idCache.clear();
     }
 
     public void rejectRequest(Long requestId, String rejectionReason) {
@@ -72,6 +82,7 @@ public class RequestService {
         }
 
         requestRepository.reject(requestId, rejectionReason);
+        idCache.clear();
     }
 
     public Optional<Long> findLastRequestIdByCustomer(Long customerId) {
@@ -87,10 +98,12 @@ public class RequestService {
         }
 
         requestRepository.updateStatus(requestId, RequestStatus.PRIORITIZED);
+        idCache.clear();
     }
 
     public void updateYoneticiTakdiri(Long requestId, YoneticiTakdiri takdir) {
         requestRepository.updateYoneticiTakdiri(requestId, takdir);
+        idCache.clear();
     }
 
     public CredibilityStats getCredibilityStats(Long customerId) {
@@ -139,6 +152,7 @@ public class RequestService {
         }
 
         requestRepository.markAsDuplicate(duplicateId, canonicalId);
+        idCache.clear();
     }
 
     private boolean isActive(RequestStatus status) {

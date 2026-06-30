@@ -1,10 +1,7 @@
 // enums/YoneticiTakdiri.java
 package com.example.enums;
 
-/**
- * Yönetici takdiri — sözel/kategorik seçim, skora EKLENEN sabit puan karşılığı.
- * Eski çarpan (YoneticiMudahalesi) mantığının yerini alır.
- */
+
 public enum YoneticiTakdiri {
     YOK(0),         // Normal / Takdir yok
     ONEMLI(5),      // Önemli / Birim hedefi

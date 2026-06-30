@@ -13,7 +13,7 @@ public class Prioritization {
     private int aciliyet;
     private int musteriDegeriPuan;
     private IsTipi isTipi;
-    private int isTimiPuan;
+    private int isTipiPuan;
     private int beklemeSuresiPuan;
     private GelistiriciMudahalesi gelistiriciMudahalesi;
     private double bazSkor;
