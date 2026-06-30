@@ -3,6 +3,8 @@ package com.example.request;
 import com.example.enums.RequestStatus;
 import com.example.enums.YoneticiTakdiri;
 import com.example.request.RequestRepository.CredibilityStats;
+import com.example.user.User;
+import com.example.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,7 @@ public class RequestService {
 
     private final RequestRepository requestRepository;
     private final StatusTransitionValidator transitionValidator;
+    private final UserService userService;
 
     public void createRequest(Request request) {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
@@ -92,5 +95,55 @@ public class RequestService {
 
     public CredibilityStats getCredibilityStats(Long customerId) {
         return requestRepository.getCredibilityStats(customerId);
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? "" : title.trim().toLowerCase().replaceAll("\\s+", " ");
+    }
+
+    /**
+     * Verilen talebin olası kopyaları: aynı şirketten, aktif (NEW/UNDER_REVIEW/PRIORITIZED),
+     * henüz birleştirilmemiş ve normalize edilmiş başlığı birebir eşleşen diğer talepler.
+     * Müşterinin şirketi yoksa boş liste döner.
+     */
+    public List<Request> findPotentialDuplicates(Request request) {
+        User customer = userService.findById(request.getCustomerId()).orElse(null);
+        if (customer == null || customer.getCompanyId() == null) {
+            return List.of();
+        }
+        String norm = normalizeTitle(request.getTitle());
+        return requestRepository.findActiveByCompany(customer.getCompanyId()).stream()
+                .filter(r -> !r.getRequestId().equals(request.getRequestId()))
+                .filter(r -> normalizeTitle(r.getTitle()).equals(norm))
+                .toList();
+    }
+
+    /**
+     * Kopya talebi ana talebe bağlar (DUPLICATE durumuna geçirir).
+     * Yalnızca aktif ve iş akışına girmemiş talepler birleştirilebilir.
+     */
+    public void mergeDuplicate(Long canonicalId, Long duplicateId) {
+        if (canonicalId.equals(duplicateId)) {
+            throw new IllegalArgumentException("Bir talep kendisiyle birleştirilemez.");
+        }
+        Request canonical = requestRepository.findById(canonicalId)
+                .orElseThrow(() -> new IllegalArgumentException("Ana talep bulunamadı."));
+        Request duplicate = requestRepository.findById(duplicateId)
+                .orElseThrow(() -> new IllegalArgumentException("Kopya talep bulunamadı."));
+
+        if (!isActive(canonical.getStatus())) {
+            throw new IllegalStateException("Ana talep aktif değil, birleştirme yapılamaz.");
+        }
+        if (!transitionValidator.isValidRequestTransition(duplicate.getStatus(), RequestStatus.DUPLICATE)) {
+            throw new IllegalStateException("Bu talep birleştirilemez. Mevcut durum: " + duplicate.getStatus());
+        }
+
+        requestRepository.markAsDuplicate(duplicateId, canonicalId);
+    }
+
+    private boolean isActive(RequestStatus status) {
+        return status == RequestStatus.NEW
+            || status == RequestStatus.UNDER_REVIEW
+            || status == RequestStatus.PRIORITIZED;
     }
 }

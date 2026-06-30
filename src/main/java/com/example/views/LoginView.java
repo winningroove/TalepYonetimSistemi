@@ -2,8 +2,11 @@ package com.example.views;
 
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.login.LoginForm;
+import com.vaadin.flow.component.login.LoginI18n;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
@@ -11,7 +14,9 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 @Route("login")
 @PageTitle("Giriş Yap")
 @AnonymousAllowed
-public class LoginView extends VerticalLayout {
+public class LoginView extends VerticalLayout implements BeforeEnterObserver {
+
+    private final LoginForm loginForm = new LoginForm();
 
     public LoginView() {
         setSizeFull();
@@ -70,9 +75,10 @@ public class LoginView extends VerticalLayout {
             .set("margin-top", "0")
             .set("margin-bottom", "20px");
 
-        LoginForm loginForm = new LoginForm();
         loginForm.setAction("login");
         loginForm.getStyle().set("width", "100%");
+        loginForm.setForgotPasswordButtonVisible(false);
+        loginForm.setI18n(turkceI18n());
 
         kart.add(girisBaslik, girisAlt, loginForm);
 
@@ -84,5 +90,31 @@ public class LoginView extends VerticalLayout {
             .set("margin-top", "32px");
 
         add(marka, altYazi, kart, dipNot);
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        // Spring Security giriş başarısız olunca login?error'a yönlendirir.
+        if (event.getLocation().getQueryParameters().getParameters().containsKey("error")) {
+            loginForm.setError(true);
+        }
+    }
+
+    private LoginI18n turkceI18n() {
+        LoginI18n i18n = LoginI18n.createDefault();
+
+        LoginI18n.Form form = i18n.getForm();
+        form.setTitle("Giriş");
+        form.setUsername("E-posta");
+        form.setPassword("Şifre");
+        form.setSubmit("Giriş Yap");
+        i18n.setForm(form);
+
+        LoginI18n.ErrorMessage hata = new LoginI18n.ErrorMessage();
+        hata.setTitle("Giriş başarısız");
+        hata.setMessage("E-posta veya şifre hatalı. Lütfen tekrar deneyin.");
+        i18n.setErrorMessage(hata);
+
+        return i18n;
     }
 }

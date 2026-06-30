@@ -165,9 +165,11 @@ public ScrumMasterView(WorkflowService workflowService,
                 atanmamis ? "Geliştirici Ata" : "Yeniden Ata",
                 e -> atamaDiyaloguAc(w)
             );
-            ataBtn.getStyle()
-                .set("background-color", atanmamis ? "#1B6EC2" : "#B45309")
-                .set("color", "white");
+            if (atanmamis) {
+                ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            } else {
+                ataBtn.getStyle().set("background", "#fff3cd").set("color", "#856404");
+            }
             return ataBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();
@@ -208,11 +210,7 @@ public ScrumMasterView(WorkflowService workflowService,
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
         grid.addColumn(w -> w.getUpdatedAt().toLocalDate()).setHeader("Tamamlanma Tarihi");
-        grid.addComponentColumn(w -> {
-            Span done = new Span("✓ Tamamlandı");
-            done.getStyle().set("color", "green").set("font-weight", "bold");
-            return done;
-        }).setHeader("Durum");
+        grid.addComponentColumn(w -> durumBadge(WorkflowStatus.DONE)).setHeader("Durum");
         grid.setWidthFull();
 
         List<Workflow> tumGorevler = workflowService.getAllWorkflows();
@@ -319,10 +317,16 @@ public ScrumMasterView(WorkflowService workflowService,
     }
 
     private Span durumBadge(WorkflowStatus status) {
-        Span badge = new Span(status.name());
+        String label = switch (status) {
+            case BACKLOG     -> "Sırada";
+            case IN_PROGRESS -> "Devam Ediyor";
+            case TESTING     -> "Test Aşamasında";
+            case DONE        -> "Tamamlandı";
+        };
+        Span badge = new Span(label);
         badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px");
         switch (status) {
-            case BACKLOG     -> badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
+            case BACKLOG     -> badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
             case IN_PROGRESS -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
             case TESTING     -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
             case DONE        -> badge.getStyle().set("background", "#d4edda").set("color", "#155724");

@@ -303,6 +303,7 @@ private String formatFileSize(Long bytes) {
             case UNDER_REVIEW -> "İncelemede";
             case PRIORITIZED  -> "Önceliklendirildi";
             case REJECTED     -> "Reddedildi";
+            case DUPLICATE    -> "Birleştirildi";
         };
     }
 
@@ -314,6 +315,7 @@ private String formatFileSize(Long bytes) {
             case UNDER_REVIEW -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
             case PRIORITIZED  -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
             case REJECTED     -> badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
+            case DUPLICATE    -> badge.getStyle().set("background", "#e2d9f3").set("color", "#4b2e83");
         }
         return badge;
     }
@@ -335,6 +337,14 @@ private String formatFileSize(Long bytes) {
             badge.getStyle()
                 .set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px")
                 .set("background", "#d4edda").set("color", "#155724").set("font-weight", "bold");
+            return badge;
+        }
+        if (r.getStatus() == RequestStatus.DUPLICATE) {
+            String ref = r.getMergedInto() != null ? " #" + r.getMergedInto() : "";
+            Span badge = new Span("Birleştirildi" + ref);
+            badge.getStyle()
+                .set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px")
+                .set("background", "#e2d9f3").set("color", "#4b2e83").set("font-weight", "bold");
             return badge;
         }
         return durumBadge(r.getStatus());

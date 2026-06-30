@@ -118,4 +118,10 @@ public class WorkflowRepository {
         String sql = "SELECT * FROM Eren_workflows ORDER BY created_at DESC";
         return jdbcTemplate.query(sql, rowMapper);
     }
+
+    public int countByDeveloperId(Long developerId) {
+        Integer c = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM Eren_workflows WHERE developer_id = ?", Integer.class, developerId);
+        return c != null ? c : 0;
+    }
 }

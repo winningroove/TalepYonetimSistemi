@@ -1,6 +1,5 @@
 package com.example.user;
 
-import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -12,7 +11,7 @@ public class User {
     private String email;
     private String password;
     private Role role;
-    private MusteriDegeri musteriDegeri;
+    private Long companyId;
     private boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

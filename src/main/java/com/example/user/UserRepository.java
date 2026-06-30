@@ -1,6 +1,5 @@
 package com.example.user;
 
-import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,9 +25,8 @@ public class UserRepository {
         user.setEmail(rs.getString("email"));
         user.setPassword(rs.getString("password"));
         user.setRole(Role.valueOf(rs.getString("role")));
-        user.setMusteriDegeri(rs.getString("musteri_degeri") != null
-                ? MusteriDegeri.valueOf(rs.getString("musteri_degeri"))
-                : null);
+        long companyId = rs.getLong("company_id");
+        user.setCompanyId(rs.wasNull() ? null : companyId);
         user.setActive(rs.getInt("is_active") == 1);
         user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         user.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
@@ -66,7 +64,7 @@ public class UserRepository {
     public void save(User user) {
         String sql = """
             INSERT INTO Eren_users
-                (user_id, name_surname, email, password, role, musteri_degeri, is_active, created_at, updated_at)
+                (user_id, name_surname, email, password, role, company_id, is_active, created_at, updated_at)
             VALUES
                 (Eren_seq_users.NEXTVAL, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP, SYSTIMESTAMP)
             """;
@@ -75,7 +73,7 @@ public class UserRepository {
                 user.getEmail(),
                 user.getPassword(),
                 user.getRole().name(),
-                user.getMusteriDegeri() != null ? user.getMusteriDegeri().name() : null,
+                user.getCompanyId(),
                 user.isActive() ? 1 : 0
         );
     }
@@ -83,14 +81,14 @@ public class UserRepository {
     public void update(User user) {
         String sql = """
             UPDATE Eren_users
-            SET name_surname = ?, email = ?, musteri_degeri = ?,
+            SET name_surname = ?, email = ?, company_id = ?,
                 is_active = ?, updated_at = SYSTIMESTAMP
             WHERE user_id = ?
             """;
         jdbcTemplate.update(sql,
                 user.getNameSurname(),
                 user.getEmail(),
-                user.getMusteriDegeri() != null ? user.getMusteriDegeri().name() : null,
+                user.getCompanyId(),
                 user.isActive() ? 1 : 0,
                 user.getUserId()
         );
@@ -104,5 +102,15 @@ public class UserRepository {
     public void setActive(Long userId, boolean isActive) {
         String sql = "UPDATE Eren_users SET is_active = ?, updated_at = SYSTIMESTAMP WHERE user_id = ?";
         jdbcTemplate.update(sql, isActive ? 1 : 0, userId);
+    }
+
+    public void delete(Long userId) {
+        jdbcTemplate.update("DELETE FROM Eren_users WHERE user_id = ?", userId);
+    }
+
+    public int countByCompanyId(Long companyId) {
+        Integer c = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM Eren_users WHERE company_id = ?", Integer.class, companyId);
+        return c != null ? c : 0;
     }
 }

@@ -19,14 +19,18 @@ import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.List;
+import com.vaadin.flow.component.grid.GridSortOrder;
+import com.vaadin.flow.data.provider.SortDirection;
 
 @Route("po")
 @PageTitle("Ürün Sorumlusu Paneli")
@@ -89,7 +93,7 @@ public class POView extends HorizontalLayout {
             .set("margin-top", "24px");
 
         Button gelenTaleplerBtn = menuButton("Gelen Talepler");
-        Button oncelikHavuzuBtn = menuButton("Önceliklendirme Havuzu");
+        Button oncelikHavuzuBtn = menuButton("Talep Sıralaması");
         Button isAkislariBtn    = menuButton("İş Akışları (Sprint)");
 
         gelenTaleplerBtn.addClickListener(e -> showGelenTalepler());
@@ -162,15 +166,61 @@ public class POView extends HorizontalLayout {
 
         H2 baslik = new H2("Gelen Talepler");
         Paragraph aciklama = new Paragraph(
-            "Müşterilerden gelen yeni talepler. İncelemeye almak için talebi seçin.");
+            "Yeni ve inceleme aşamasındaki talepler. İncelemeye alıp doğrudan önceliklendirin veya reddedin.");
 
         grid.removeAllColumns();
-        grid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px");
-        grid.addColumn(r -> musteri(r.getCustomerId())).setHeader("Müşteri").setAutoWidth(true);
-        grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
-        grid.addColumn(r -> r.getCreatedAt().toLocalDate()).setHeader("Tarih");
-        grid.addComponentColumn(r -> {
-            Button btn = new Button("İncelemeye Al", e -> {
+        grid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px")
+            .setComparator(Comparator.comparingLong(Request::getRequestId));
+        grid.addColumn(r -> musteri(r.getCustomerId())).setHeader("Müşteri").setAutoWidth(true)
+            .setComparator((a, b) -> musteri(a.getCustomerId()).compareTo(musteri(b.getCustomerId())));
+        grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true)
+            .setComparator(Comparator.comparing(Request::getTitle));
+        grid.addColumn(r -> r.getCreatedAt().toLocalDate()).setHeader("Tarih")
+            .setComparator(Comparator.comparing(Request::getCreatedAt));
+        grid.addComponentColumn(r -> gelenTalepDurumBadge(r.getStatus())).setHeader("Durum")
+            .setAutoWidth(true).setFlexGrow(0);
+        grid.addComponentColumn(this::kopyaUyariBadge).setHeader("Kopya")
+            .setAutoWidth(true).setFlexGrow(0);
+        grid.addComponentColumn(r -> gelenTalepIslemButonlari(r)).setHeader("İşlem")
+            .setAutoWidth(true).setFlexGrow(0);
+        grid.setWidthFull();
+
+        List<Request> talepler = new ArrayList<>();
+        talepler.addAll(requestService.getByStatus(RequestStatus.NEW));
+        talepler.addAll(requestService.getByStatus(RequestStatus.UNDER_REVIEW));
+        requestService.getByStatus(RequestStatus.PRIORITIZED).stream()
+            .filter(r -> workflowService.findByRequestId(r.getRequestId()).isEmpty())
+            .forEach(talepler::add);
+        talepler.sort(Comparator.comparing(Request::getCreatedAt));
+        grid.setItems(talepler);
+
+        mainContent.add(baslik, aciklama, grid);
+    }
+
+    private Span gelenTalepDurumBadge(RequestStatus status) {
+        String label = switch (status) {
+            case NEW          -> "Yeni";
+            case UNDER_REVIEW -> "İncelemede";
+            case PRIORITIZED  -> "Önceliklendirildi";
+            default           -> status.name();
+        };
+        Span badge = new Span(label);
+        badge.getStyle()
+            .set("padding", "4px 8px").set("border-radius", "4px")
+            .set("font-size", "12px").set("font-weight", "bold");
+        switch (status) {
+            case NEW          -> badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
+            case UNDER_REVIEW -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
+            case PRIORITIZED  -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+            default           -> {}
+        }
+        return badge;
+    }
+
+    private HorizontalLayout gelenTalepIslemButonlari(Request r) {
+        HorizontalLayout layout = new HorizontalLayout();
+        if (r.getStatus() == RequestStatus.NEW) {
+            Button incelemeBtn = new Button("İncelemeye Al", e -> {
                 try {
                     requestService.takeUnderReview(r.getRequestId());
                     showGelenTalepler();
@@ -178,40 +228,153 @@ public class POView extends HorizontalLayout {
                     Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
                 }
             });
-            btn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-            return btn;
-        }).setHeader("İşlem");
-        grid.setWidthFull();
-        grid.setItems(requestService.getByStatus(RequestStatus.NEW));
+            incelemeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            layout.add(incelemeBtn);
+        } else if (r.getStatus() == RequestStatus.UNDER_REVIEW) {
+            Button oncelikBtn = new Button("Önceliklendir",
+                e -> onceliklendirmeDialogAc(r, this::showGelenTalepler));
+            oncelikBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
 
-        mainContent.add(baslik, aciklama, grid);
+            Button reddetBtn = new Button("Reddet", e -> reddetDialogAc(r, this::showGelenTalepler));
+            reddetBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+
+            layout.add(oncelikBtn, reddetBtn);
+        } else if (r.getStatus() == RequestStatus.PRIORITIZED) {
+            Button isAkisiBtn = new Button("İş Akışına Çevir", e -> {
+                try {
+                    workflowService.createWorkflow(r.getRequestId());
+                    Notification.show("Talep iş akışına alındı.", 3000, Notification.Position.TOP_CENTER);
+                    showGelenTalepler();
+                } catch (Exception ex) {
+                    Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+                }
+            });
+            isAkisiBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            layout.add(isAkisiBtn);
+        }
+        return layout;
+    }
+
+    /** Aynı şirketten benzer başlıklı talep varsa uyarı rozeti; tıklanınca birleştirme dialog'u açılır. */
+    private com.vaadin.flow.component.Component kopyaUyariBadge(Request r) {
+        List<Request> kopyalar = requestService.findPotentialDuplicates(r);
+        if (kopyalar.isEmpty()) {
+            Span bos = new Span("-");
+            bos.getStyle().set("color", "#bbb");
+            return bos;
+        }
+        Button uyari = new Button("⚠ Olası kopya (" + kopyalar.size() + ")",
+            e -> mergeDialogAc(r, kopyalar));
+        uyari.getStyle()
+            .set("background", "#fff3cd").set("color", "#856404")
+            .set("font-size", "12px").set("font-weight", "bold")
+            .set("border", "1px solid #ffe08a").set("cursor", "pointer");
+        return uyari;
+    }
+
+    private void mergeDialogAc(Request secili, List<Request> kopyalar) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Olası Kopya Talepler");
+        dialog.setWidth("560px");
+
+        VerticalLayout icerik = new VerticalLayout();
+        icerik.setPadding(false);
+        icerik.setSpacing(true);
+
+        Paragraph aciklama = new Paragraph(
+            "Aynı şirketten aynı başlıkla gelen talepler. Ana talebi seçin; diğerleri ona "
+            + "bağlanıp 'Birleştirildi' durumuna geçecek. İş akışı ve önceliklendirme yalnızca "
+            + "ana talep üzerinden yürür.");
+        aciklama.getStyle().set("font-size", "13px").set("color", "#555");
+
+        // Grup = seçili talep + kopyaları
+        List<Request> grup = new ArrayList<>();
+        grup.add(secili);
+        grup.addAll(kopyalar);
+        grup.sort(Comparator.comparing(Request::getCreatedAt));
+
+        RadioButtonGroup<Request> anaSecim = new RadioButtonGroup<>();
+        anaSecim.setLabel("Ana talep (korunacak)");
+        anaSecim.setItems(grup);
+        anaSecim.setItemLabelGenerator(r ->
+            "#" + r.getRequestId() + " — " + musteri(r.getCustomerId())
+            + " (" + r.getCreatedAt().toLocalDate() + ")");
+        anaSecim.setValue(grup.get(0)); // en eski talep varsayılan ana talep
+        anaSecim.getStyle().set("margin-top", "8px");
+
+        icerik.add(aciklama, anaSecim);
+
+        Button birlestirBtn = new Button("Birleştir", e -> {
+            Request ana = anaSecim.getValue();
+            if (ana == null) {
+                Notification.show("Ana talebi seçiniz.", 3000, Notification.Position.MIDDLE);
+                return;
+            }
+            try {
+                int sayac = 0;
+                for (Request r : grup) {
+                    if (!r.getRequestId().equals(ana.getRequestId())) {
+                        requestService.mergeDuplicate(ana.getRequestId(), r.getRequestId());
+                        sayac++;
+                    }
+                }
+                Notification.show(sayac + " talep #" + ana.getRequestId() + " ile birleştirildi.",
+                    3000, Notification.Position.TOP_CENTER);
+                dialog.close();
+                showGelenTalepler();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+            }
+        });
+        birlestirBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+        Button iptalBtn = new Button("İptal", e -> dialog.close());
+
+        dialog.add(icerik);
+        dialog.getFooter().add(iptalBtn, birlestirBtn);
+        dialog.open();
     }
 
     private void showOnceliklendirmeHavuzu() {
         mainContent.removeAll();
 
-        H2 baslik = new H2("Önceliklendirme Bekleyen Müşteri Talepleri");
+        H2 baslik = new H2("Talep Sıralaması");
         Paragraph aciklama = new Paragraph(
-            "Talepler öncelik skoruna göre sıralanmaktadır. " +
-            "Not: Geliştirici çaba tahmini Scrum Master tarafından girilecektir.");
+            "Tüm aktif talepler öncelik skoruna göre sıralanmaktadır. Not: Geliştirici çaba tahmini Scrum Master tarafından girilecektir.");
 
         grid.removeAllColumns();
-        grid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px");
-        grid.addColumn(r -> musteri(r.getCustomerId())).setHeader("Müşteri").setAutoWidth(true);
-        grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
-        grid.addComponentColumn(r -> skorBadge(r)).setHeader("Skor");
-        grid.addComponentColumn(r -> islemButonlari(r)).setHeader("İşlem");
+
+        grid.addColumn(r -> "#" + r.getRequestId())
+            .setHeader("ID").setWidth("80px")
+            .setComparator(Comparator.comparingLong(Request::getRequestId));
+
+        grid.addColumn(r -> musteri(r.getCustomerId()))
+            .setHeader("Müşteri").setAutoWidth(true)
+            .setComparator((a, b) -> musteri(a.getCustomerId()).compareTo(musteri(b.getCustomerId())));
+
+        grid.addColumn(Request::getTitle)
+            .setHeader("Başlık").setAutoWidth(true)
+            .setComparator(Comparator.comparing(Request::getTitle));
+
+        var skorColumn = grid.addComponentColumn(r -> skorBadge(r))
+            .setHeader("Skor")
+            .setComparator(Comparator.comparingInt(r ->
+                prioritizationService.findByRequestId(r.getRequestId())
+                    .map(Prioritization::getPriorityScore).orElse(0)));
+
+        grid.addComponentColumn(r -> {
+            Button detayBtn = new Button("Detay", e -> talepDetayDialogAc(r));
+            detayBtn.getStyle().set("font-size", "12px");
+            return detayBtn;
+        }).setHeader("Detay").setWidth("90px").setFlexGrow(0);
+
+        grid.addComponentColumn(r -> islemButonlari(r))
+            .setHeader("İşlem")
+            .setComparator(Comparator.comparingInt(r -> pipelineSirasi(r)));
         grid.setWidthFull();
 
-        List<Request> talepler = requestService.getAllActiveRequests();
-        talepler.sort((a, b) -> {
-            int skorA = prioritizationService.findByRequestId(a.getRequestId())
-                .map(Prioritization::getPriorityScore).orElse(0);
-            int skorB = prioritizationService.findByRequestId(b.getRequestId())
-                .map(Prioritization::getPriorityScore).orElse(0);
-            return Integer.compare(skorB, skorA);
-        });
-        grid.setItems(talepler);
+        grid.setItems(requestService.getAllActiveRequests());
+        grid.sort(List.of(new GridSortOrder<>(skorColumn, SortDirection.DESCENDING)));
 
         mainContent.add(baslik, aciklama, grid);
     }
@@ -261,9 +424,9 @@ public class POView extends HorizontalLayout {
                 .set("padding", "4px 8px")
                 .set("border-radius", "4px")
                 .set("font-weight", "bold");
-            if (skor >= 81)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
-            else if (skor >= 61) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
-            else if (skor >= 41) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+            if (skor >= 85)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
+            else if (skor >= 69) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
+            else if (skor >= 53) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
             else                 badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
             return badge;
         })
@@ -305,9 +468,7 @@ public class POView extends HorizontalLayout {
     workflowService.findByRequestId(r.getRequestId()).ifPresentOrElse(
         w -> {
             if (w.getWorkflowStatus() == WorkflowStatus.DONE) {
-                Span done = new Span("✓ Tamamlandı");
-                done.getStyle().set("color", "green").set("font-weight", "bold");
-                layout.add(done);
+                layout.add(workflowBadge(WorkflowStatus.DONE));
             } else {
                 // Çaba tahmini girildi mi kontrol et
                 boolean cabaGirildi = prioritizationService
@@ -354,6 +515,10 @@ public class POView extends HorizontalLayout {
     }
 
     private void onceliklendirmeDialogAc(Request request) {
+        onceliklendirmeDialogAc(request, this::showOnceliklendirmeHavuzu);
+    }
+
+    private void onceliklendirmeDialogAc(Request request, Runnable onSuccess) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Talep Önceliklendirme — #" + request.getRequestId());
         dialog.setWidth("550px");
@@ -373,7 +538,7 @@ public class POView extends HorizontalLayout {
         Span beklemeSuresi = new Span("Bekleme Süresi Puanı: " +
             prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
 
-        Span musteriDegeriSpan = new Span("Müşteri Değeri: " + musteriDegeriLabel);
+        Span musteriDegeriSpan = new Span("Şirket Değeri: " + musteriDegeriLabel);
         musteriDegeriSpan.getStyle().set("color", "#2C6FAC").set("font-weight", "bold");
 
         // Requester Credibility (güvenilirlik) — talep sahibinin geçmiş performansı
@@ -496,7 +661,7 @@ public class POView extends HorizontalLayout {
                 Notification.show("Önceliklendirme kaydedildi. Scrum Master çaba tahminini girecektir.",
                     4000, Notification.Position.TOP_CENTER);
                 dialog.close();
-                showOnceliklendirmeHavuzu();
+                onSuccess.run();
             } catch (Exception ex) {
                 Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
             }
@@ -574,6 +739,10 @@ if (!dosyalar.isEmpty()) {
     }
 
     private void reddetDialogAc(Request request) {
+        reddetDialogAc(request, this::showOnceliklendirmeHavuzu);
+    }
+
+    private void reddetDialogAc(Request request, Runnable onSuccess) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Talebi Reddet — #" + request.getRequestId());
 
@@ -586,7 +755,7 @@ if (!dosyalar.isEmpty()) {
                 requestService.rejectRequest(request.getRequestId(), gerekcaField.getValue());
                 Notification.show("Talep reddedildi.", 3000, Notification.Position.TOP_CENTER);
                 dialog.close();
-                showOnceliklendirmeHavuzu();
+                onSuccess.run();
             } catch (Exception ex) {
                 Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
             }
@@ -603,6 +772,73 @@ if (!dosyalar.isEmpty()) {
     return (bytes / (1024 * 1024)) + " MB";
 }
 
+
+    private void talepDetayDialogAc(Request r) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Talep Detayı — #" + r.getRequestId());
+        dialog.setWidth("520px");
+
+        VerticalLayout icerik = new VerticalLayout();
+        icerik.setPadding(false);
+        icerik.setSpacing(true);
+
+        Span musteriSpan = new Span("Müşteri: " + musteri(r.getCustomerId()));
+        musteriSpan.getStyle().set("color", "#555").set("font-size", "13px");
+
+        Span tarihSpan = new Span("Tarih: " + r.getCreatedAt().toLocalDate());
+        tarihSpan.getStyle().set("color", "#555").set("font-size", "13px");
+
+        H4 baslikLabel = new H4(r.getTitle());
+        baslikLabel.getStyle().set("margin", "8px 0 4px 0");
+
+        Paragraph aciklama = new Paragraph(r.getDescription());
+        aciklama.getStyle()
+            .set("background", "#f8f9fa")
+            .set("border-radius", "6px")
+            .set("padding", "12px")
+            .set("font-size", "13px")
+            .set("white-space", "pre-wrap");
+
+        icerik.add(musteriSpan, tarihSpan, baslikLabel, aciklama);
+
+        List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(r.getRequestId());
+        if (!dosyalar.isEmpty()) {
+            H4 dosyaBaslik = new H4("Ekli Dosyalar");
+            dosyaBaslik.getStyle().set("margin-bottom", "4px");
+            icerik.add(dosyaBaslik);
+            for (RequestFile dosya : dosyalar) {
+                Anchor link = new Anchor(
+                    "data:application/octet-stream;base64," +
+                    java.util.Base64.getEncoder().encodeToString(dosya.getFileData()),
+                    "📎 " + dosya.getFileName() + " (" + formatFileSize(dosya.getFileSize()) + ")"
+                );
+                link.getElement().setAttribute("download", dosya.getFileName());
+                link.getStyle().set("display", "block").set("margin-bottom", "4px");
+                icerik.add(link);
+            }
+        }
+
+        dialog.add(icerik);
+        dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
+        dialog.open();
+    }
+
+    private int pipelineSirasi(Request r) {
+        return switch (r.getStatus()) {
+            case NEW          -> 0;
+            case UNDER_REVIEW -> 1;
+            case REJECTED     -> 7;
+            case DUPLICATE    -> 6;
+            case PRIORITIZED  -> workflowService.findByRequestId(r.getRequestId())
+                .map(w -> switch (w.getWorkflowStatus()) {
+                    case BACKLOG     -> 2;
+                    case IN_PROGRESS -> 3;
+                    case TESTING     -> 4;
+                    case DONE        -> 5;
+                })
+                .orElse(2);
+        };
+    }
 
     private String musteri(Long customerId) {
         return userService.findById(customerId)

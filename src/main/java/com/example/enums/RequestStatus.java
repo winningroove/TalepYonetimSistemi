@@ -5,5 +5,6 @@ public enum RequestStatus {
     NEW,
     UNDER_REVIEW,
     PRIORITIZED,
-    REJECTED
+    REJECTED,
+    DUPLICATE
 }

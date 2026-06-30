@@ -66,12 +66,15 @@ public class PrioritizationService {
         return Math.min(100, Math.max(0, skor));
     }
 
+    // Baz skor matematiksel olarak 20-100 aralığına sıkışır (her faktör 1-5,
+    // alt sınır asla 0 değil), bu yüzden bantlar 0-100 değil gerçek 20-100
+    // aralığına göre kalibre edilmiştir.
     public String getLabel(int score) {
         if (score == 0)  return "İPTAL";
-        if (score <= 20) return "ÇOK DÜŞÜK";
-        if (score <= 40) return "DÜŞÜK";
-        if (score <= 60) return "ORTA";
-        if (score <= 80) return "YÜKSEK";
+        if (score <= 36) return "ÇOK DÜŞÜK";
+        if (score <= 52) return "DÜŞÜK";
+        if (score <= 68) return "ORTA";
+        if (score <= 84) return "YÜKSEK";
         return "KRİTİK";
     }
 

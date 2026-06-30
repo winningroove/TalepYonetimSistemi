@@ -14,6 +14,7 @@ public class Request {
     private RequestStatus status;
     private String rejectionReason;
     private YoneticiTakdiri yoneticiTakdiri;
+    private Long mergedInto;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

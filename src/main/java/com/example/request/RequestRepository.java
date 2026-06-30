@@ -31,11 +31,13 @@ public class RequestRepository {
         request.setYoneticiTakdiri(takdiri != null ? YoneticiTakdiri.valueOf(takdiri) : YoneticiTakdiri.YOK);
         request.setCreatedAt(rs.getTimestamp(8).toLocalDateTime());
         request.setUpdatedAt(rs.getTimestamp(9).toLocalDateTime());
+        long mergedInto = rs.getLong(10);
+        request.setMergedInto(rs.wasNull() ? null : mergedInto);
         return request;
     };
 
     public Optional<Request> findById(Long requestId) {
-        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests WHERE request_id = ?";
+        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at, merged_into FROM Eren_requests WHERE request_id = ?";
         try {
             return Optional.ofNullable(jdbcTemplate.queryForObject(sql, rowMapper, requestId));
         } catch (EmptyResultDataAccessException e) {
@@ -45,7 +47,7 @@ public class RequestRepository {
 
     public List<Request> findByCustomerId(Long customerId) {
         String sql = """
-            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests
+            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at, merged_into FROM Eren_requests
             WHERE customer_id = ?
             ORDER BY created_at DESC
             """;
@@ -54,15 +56,15 @@ public class RequestRepository {
 
     public List<Request> findAllActive() {
         String sql = """
-            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests
-            WHERE status != 'REJECTED'
+            SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at, merged_into FROM Eren_requests
+            WHERE status NOT IN ('REJECTED', 'DUPLICATE')
             ORDER BY created_at ASC
             """;
         return jdbcTemplate.query(sql, rowMapper);
     }
 
     public List<Request> findByStatus(RequestStatus status) {
-        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at FROM Eren_requests WHERE status = ? ORDER BY created_at ASC";
+        String sql = "SELECT request_id, customer_id, title, description, status, rejection_reason, yonetici_takdiri, created_at, updated_at, merged_into FROM Eren_requests WHERE status = ? ORDER BY created_at ASC";
         return jdbcTemplate.query(sql, rowMapper, status.name());
     }
 
@@ -120,6 +122,37 @@ public class RequestRepository {
             WHERE request_id = ?
             """;
         jdbcTemplate.update(sql, takdir.name(), requestId);
+    }
+
+    /** Talebi DUPLICATE olarak işaretler ve ana talebe bağlar. */
+    public void markAsDuplicate(Long requestId, Long mergedIntoId) {
+        String sql = """
+            UPDATE Eren_requests
+            SET status = 'DUPLICATE', merged_into = ?, updated_at = SYSTIMESTAMP
+            WHERE request_id = ?
+            """;
+        jdbcTemplate.update(sql, mergedIntoId, requestId);
+    }
+
+    /** Bir şirketin aktif (NEW/UNDER_REVIEW/PRIORITIZED) ve henüz birleştirilmemiş talepleri. */
+    public List<Request> findActiveByCompany(Long companyId) {
+        String sql = """
+            SELECT r.request_id, r.customer_id, r.title, r.description, r.status,
+                   r.rejection_reason, r.yonetici_takdiri, r.created_at, r.updated_at, r.merged_into
+            FROM Eren_requests r
+            JOIN Eren_users u ON r.customer_id = u.user_id
+            WHERE u.company_id = ?
+              AND r.status IN ('NEW', 'UNDER_REVIEW', 'PRIORITIZED')
+              AND r.merged_into IS NULL
+            ORDER BY r.created_at ASC
+            """;
+        return jdbcTemplate.query(sql, rowMapper, companyId);
+    }
+
+    public int countByCustomerId(Long customerId) {
+        Integer c = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM Eren_requests WHERE customer_id = ?", Integer.class, customerId);
+        return c != null ? c : 0;
     }
 
     public CredibilityStats getCredibilityStats(Long customerId) {

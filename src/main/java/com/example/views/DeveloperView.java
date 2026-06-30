@@ -176,21 +176,20 @@ public class DeveloperView extends HorizontalLayout {
                     return badge;
                 }
                 int skor = p.getPriorityScore();
-                String label = switch (skor / 20) {
-                    case 4  -> "Kritik";
-                    case 3  -> "Yüksek";
-                    case 2  -> "Orta";
-                    case 1  -> "Düşük";
-                    default -> skor >= 81 ? "Kritik" : "Çok Düşük";
-                };
+                String label;
+                if (skor >= 85)      label = "Kritik";
+                else if (skor >= 69) label = "Yüksek";
+                else if (skor >= 53) label = "Orta";
+                else if (skor >= 37) label = "Düşük";
+                else                 label = "Çok Düşük";
                 Span badge = new Span(skor + " (" + label + ")");
                 badge.getStyle()
                     .set("padding", "4px 8px")
                     .set("border-radius", "4px")
                     .set("font-weight", "bold");
-                if (skor >= 81)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
-                else if (skor >= 61) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
-                else if (skor >= 41) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
+                if (skor >= 85)      badge.getStyle().set("background", "#f8d7da").set("color", "#721c24");
+                else if (skor >= 69) badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
+                else if (skor >= 53) badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
                 else                 badge.getStyle().set("background", "#e0e0e0").set("color", "#333");
                 return badge;
             })

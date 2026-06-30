@@ -1,6 +1,8 @@
 // security/DataInitializer.java
 package com.example.security;
 
+import com.example.company.Company;
+import com.example.company.CompanyService;
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
 import com.example.user.User;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class DataInitializer implements ApplicationRunner {
 
     private final UserService userService;
+    private final CompanyService companyService;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -31,6 +34,13 @@ public class DataInitializer implements ApplicationRunner {
         }
 
         log.info("DataInitializer: Başlangıç kullanıcıları oluşturuluyor...");
+
+        // Şirketler (değer artık şirkete ait; müşteri şirketinden miras alır)
+        // (aynı şirkette 2 müşteri -> kopya tespiti demosu için)
+        Company teknoCorp  = companyService.createCompany("TeknoCorp", MusteriDegeri.VIP);
+        Company globalAs   = companyService.createCompany("Global A.Ş.", MusteriDegeri.BUYUK);
+        Company musteriLtd = companyService.createCompany("Müşteri Ltd.", MusteriDegeri.ORTA);
+        Company medyaTr    = companyService.createCompany("Medya TR", MusteriDegeri.KUCUK);
 
         User admin = new User();
         admin.setNameSurname("Sistem Admin");
@@ -66,29 +76,37 @@ public class DataInitializer implements ApplicationRunner {
         c1.setNameSurname("TeknoCorp Yetkili");
         c1.setEmail("yetkili@teknocorp.com");
         c1.setRole(Role.CUSTOMER);
-        c1.setMusteriDegeri(MusteriDegeri.VIP);
+        c1.setCompanyId(teknoCorp.getCompanyId());
         userService.createUser(c1, "Cust1234!");
 
         User c2 = new User();
         c2.setNameSurname("Global A.Ş. Temsilci");
         c2.setEmail("temsilci@globalas.com");
         c2.setRole(Role.CUSTOMER);
-        c2.setMusteriDegeri(MusteriDegeri.BUYUK);
+        c2.setCompanyId(globalAs.getCompanyId());
         userService.createUser(c2, "Cust1234!");
 
         User c3 = new User();
         c3.setNameSurname("Mehmet Öz");
         c3.setEmail("mehmet.oz@musteri.com");
         c3.setRole(Role.CUSTOMER);
-        c3.setMusteriDegeri(MusteriDegeri.ORTA);
+        c3.setCompanyId(musteriLtd.getCompanyId());
         userService.createUser(c3, "Cust1234!");
 
         User c4 = new User();
         c4.setNameSurname("Medya TR");
         c4.setEmail("iletisim@medyatr.com");
         c4.setRole(Role.CUSTOMER);
-        c4.setMusteriDegeri(MusteriDegeri.KUCUK);
+        c4.setCompanyId(medyaTr.getCompanyId());
         userService.createUser(c4, "Cust1234!");
+
+        // TeknoCorp'ta ikinci müşteri -> aynı şirketten iki kişi (kopya tespiti demosu)
+        User c5 = new User();
+        c5.setNameSurname("TeknoCorp Destek");
+        c5.setEmail("destek@teknocorp.com");
+        c5.setRole(Role.CUSTOMER);
+        c5.setCompanyId(teknoCorp.getCompanyId());
+        userService.createUser(c5, "Cust1234!");
 
         log.info("DataInitializer: Tüm kullanıcılar oluşturuldu.");
     }
