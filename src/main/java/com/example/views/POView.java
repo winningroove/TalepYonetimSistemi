@@ -9,6 +9,8 @@ import com.example.request.RequestFileService;
 import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
+import com.example.util.DateUtil;
+import com.example.util.GridSearch;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -42,6 +44,7 @@ public class POView extends HorizontalLayout {
     private final WorkflowService workflowService;
     private final UserService userService;
     private final RequestFileService requestFileService;
+    private final com.example.company.CompanyService companyService;
 
     private String currentUserName;
 
@@ -51,12 +54,14 @@ public class POView extends HorizontalLayout {
     public POView(RequestService requestService,
                   PrioritizationService prioritizationService,
                   WorkflowService workflowService,
-                  UserService userService, RequestFileService requestFileService) {
+                  UserService userService, RequestFileService requestFileService,
+                  com.example.company.CompanyService companyService) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
         this.userService = userService;
         this.requestFileService = requestFileService;
+        this.companyService = companyService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
@@ -173,9 +178,11 @@ public class POView extends HorizontalLayout {
             .setComparator(Comparator.comparingLong(Request::getRequestId));
         grid.addColumn(r -> musteri(r.getCustomerId())).setHeader("Müşteri").setAutoWidth(true)
             .setComparator((a, b) -> musteri(a.getCustomerId()).compareTo(musteri(b.getCustomerId())));
+        grid.addColumn(r -> sirketAdi(r.getCustomerId())).setHeader("Şirket").setAutoWidth(true)
+            .setComparator((a, b) -> sirketAdi(a.getCustomerId()).compareTo(sirketAdi(b.getCustomerId())));
         grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true)
             .setComparator(Comparator.comparing(Request::getTitle));
-        grid.addColumn(r -> r.getCreatedAt().toLocalDate()).setHeader("Tarih")
+        grid.addColumn(r -> DateUtil.format(r.getCreatedAt())).setHeader("Tarih")
             .setComparator(Comparator.comparing(Request::getCreatedAt));
         grid.addComponentColumn(r -> gelenTalepDurumBadge(r.getStatus())).setHeader("Durum")
             .setAutoWidth(true).setFlexGrow(0);
@@ -192,9 +199,13 @@ public class POView extends HorizontalLayout {
             .filter(r -> workflowService.findByRequestId(r.getRequestId()).isEmpty())
             .forEach(talepler::add);
         talepler.sort(Comparator.comparing(Request::getCreatedAt));
+
+        var arama = GridSearch.create(grid, talepler,
+            "Ara: talep, müşteri, şirket, tarih...", this::talepAranabilir);
+
         grid.setItems(talepler);
 
-        mainContent.add(baslik, aciklama, grid);
+        mainContent.add(baslik, aciklama, arama, grid);
     }
 
     private Span gelenTalepDurumBadge(RequestStatus status) {
@@ -298,7 +309,7 @@ public class POView extends HorizontalLayout {
         anaSecim.setItems(grup);
         anaSecim.setItemLabelGenerator(r ->
             "#" + r.getRequestId() + " — " + musteri(r.getCustomerId())
-            + " (" + r.getCreatedAt().toLocalDate() + ")");
+            + " (" + DateUtil.format(r.getCreatedAt()) + ")");
         anaSecim.setValue(grup.get(0)); // en eski talep varsayılan ana talep
         anaSecim.getStyle().set("margin-top", "8px");
 
@@ -352,6 +363,10 @@ public class POView extends HorizontalLayout {
             .setHeader("Müşteri").setAutoWidth(true)
             .setComparator((a, b) -> musteri(a.getCustomerId()).compareTo(musteri(b.getCustomerId())));
 
+        grid.addColumn(r -> sirketAdi(r.getCustomerId()))
+            .setHeader("Şirket").setAutoWidth(true)
+            .setComparator((a, b) -> sirketAdi(a.getCustomerId()).compareTo(sirketAdi(b.getCustomerId())));
+
         grid.addColumn(Request::getTitle)
             .setHeader("Başlık").setAutoWidth(true)
             .setComparator(Comparator.comparing(Request::getTitle));
@@ -370,13 +385,18 @@ public class POView extends HorizontalLayout {
 
         grid.addComponentColumn(r -> islemButonlari(r))
             .setHeader("İşlem")
-            .setComparator(Comparator.comparingInt(r -> pipelineSirasi(r)));
+            .setComparator(Comparator.comparingInt(r -> pipelineSirasi(r)))
+            .setAutoWidth(true).setFlexGrow(0);
         grid.setWidthFull();
 
-        grid.setItems(requestService.getAllActiveRequests());
+        List<Request> aktifTalepler = requestService.getAllActiveRequests();
+        var arama = GridSearch.create(grid, aktifTalepler,
+            "Ara: talep, müşteri, şirket, tarih...", this::talepAranabilir);
+
+        grid.setItems(aktifTalepler);
         grid.sort(List.of(new GridSortOrder<>(skorColumn, SortDirection.DESCENDING)));
 
-        mainContent.add(baslik, aciklama, grid);
+        mainContent.add(baslik, aciklama, arama, grid);
     }
 
     private void showIsAkislari() {
@@ -387,6 +407,7 @@ public class POView extends HorizontalLayout {
         Grid<Request> isAkisiGrid = new Grid<>(Request.class, false);
         isAkisiGrid.addColumn(r -> "#" + r.getRequestId()).setHeader("ID").setWidth("80px");
         isAkisiGrid.addColumn(r -> musteri(r.getCustomerId())).setHeader("Müşteri").setAutoWidth(true);
+        isAkisiGrid.addColumn(r -> sirketAdi(r.getCustomerId())).setHeader("Şirket").setAutoWidth(true);
         isAkisiGrid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
         isAkisiGrid.addComponentColumn(r ->
             workflowService.findByRequestId(r.getRequestId())
@@ -398,9 +419,13 @@ public class POView extends HorizontalLayout {
         List<Request> isAkisindakiler = requestService.getAllActiveRequests().stream()
             .filter(r -> workflowService.findByRequestId(r.getRequestId()).isPresent())
             .toList();
+
+        var arama = GridSearch.create(isAkisiGrid, isAkisindakiler,
+            "Ara: talep, müşteri, şirket, tarih...", this::talepAranabilir);
+
         isAkisiGrid.setItems(isAkisindakiler);
 
-        mainContent.add(baslik, isAkisiGrid);
+        mainContent.add(baslik, arama, isAkisiGrid);
     }
 
     private Span skorBadge(Request r) {
@@ -443,6 +468,8 @@ public class POView extends HorizontalLayout {
 
     private HorizontalLayout islemButonlari(Request r) {
         HorizontalLayout layout = new HorizontalLayout();
+        layout.setPadding(false);
+        layout.getStyle().set("flex-wrap", "nowrap");
 
         if (r.getStatus() == RequestStatus.NEW) {
             Button btn = new Button("İncelemeye Al", e -> {
@@ -785,7 +812,7 @@ if (!dosyalar.isEmpty()) {
         Span musteriSpan = new Span("Müşteri: " + musteri(r.getCustomerId()));
         musteriSpan.getStyle().set("color", "#555").set("font-size", "13px");
 
-        Span tarihSpan = new Span("Tarih: " + r.getCreatedAt().toLocalDate());
+        Span tarihSpan = new Span("Tarih: " + DateUtil.format(r.getCreatedAt()));
         tarihSpan.getStyle().set("color", "#555").set("font-size", "13px");
 
         H4 baslikLabel = new H4(r.getTitle());
@@ -844,5 +871,20 @@ if (!dosyalar.isEmpty()) {
         return userService.findById(customerId)
             .map(User::getNameSurname)
             .orElse("Bilinmiyor");
+    }
+
+    private String sirketAdi(Long customerId) {
+        return userService.findById(customerId)
+            .map(u -> companyService.getName(u.getCompanyId()))
+            .orElse("-");
+    }
+
+    /** Bir talep için aranabilir metin: id, müşteri, şirket, başlık, tarih. */
+    private String talepAranabilir(Request r) {
+        return "#" + r.getRequestId()
+            + " " + musteri(r.getCustomerId())
+            + " " + sirketAdi(r.getCustomerId())
+            + " " + r.getTitle()
+            + " " + DateUtil.format(r.getCreatedAt());
     }
 }

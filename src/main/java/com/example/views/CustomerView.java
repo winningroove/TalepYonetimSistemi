@@ -7,6 +7,8 @@ import com.example.request.RequestFile;
 import com.example.request.RequestFileService;
 import com.example.request.RequestService;
 import com.example.user.UserService;
+import com.example.util.DateUtil;
+import com.example.util.GridSearch;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -233,7 +235,7 @@ public CustomerView(RequestService requestService,
 
         grid.removeAllColumns();
         grid.addColumn(Request::getTitle).setHeader("Başlık").setAutoWidth(true);
-        grid.addColumn(r -> r.getCreatedAt().toLocalDate()).setHeader("Tarih");
+        grid.addColumn(r -> DateUtil.format(r.getCreatedAt())).setHeader("Tarih");
         grid.addComponentColumn(this::durumBadgeFor).setHeader("Durum");
         grid.addComponentColumn(r -> {
             Button detayBtn = new Button("Detay", e -> detayDialogAc(r));
@@ -241,11 +243,16 @@ public CustomerView(RequestService requestService,
         }).setHeader("İşlem");
         grid.setWidthFull();
 
-        if (currentUserId != null) {
-            grid.setItems(requestService.getCustomerRequests(currentUserId));
-        }
+        List<Request> talepler = currentUserId != null
+            ? requestService.getCustomerRequests(currentUserId)
+            : List.of();
 
-        mainContent.add(baslik, grid);
+        var arama = GridSearch.create(grid, talepler, "Ara: başlık, durum, tarih...",
+            r -> r.getTitle() + " " + durumMetni(r) + " " + DateUtil.format(r.getCreatedAt()));
+
+        grid.setItems(talepler);
+
+        mainContent.add(baslik, arama, grid);
     }
 
     private void detayDialogAc(Request request) {
@@ -256,7 +263,7 @@ public CustomerView(RequestService requestService,
     icerik.add(new Span("Başlık: " + request.getTitle()));
     icerik.add(new Span("Açıklama: " + request.getDescription()));
     icerik.add(new Span("Durum: " + durumMetni(request)));
-    icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
+    icerik.add(new Span("Tarih: " + DateUtil.format(request.getCreatedAt())));
 
     if (request.getStatus() == RequestStatus.REJECTED
             && request.getRejectionReason() != null) {

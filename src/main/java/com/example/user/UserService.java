@@ -9,7 +9,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +23,21 @@ public class UserService {
     private final RequestRepository requestRepository;
     private final WorkflowRepository workflowRepository;
 
+    /** Ad/şirket çözümlemesi grid'lerde çok sık çağrıldığı için id->User önbelleği.
+     *  Tüm yazma işlemleri önbelleği temizler (uygulama içi tek yazma yolu servislerdir). */
+    private final Map<Long, User> idCache = new ConcurrentHashMap<>();
+
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 
     public Optional<User> findById(Long userId) {
-        return userRepository.findById(userId);
+        if (userId == null) return Optional.empty();
+        User cached = idCache.get(userId);
+        if (cached != null) return Optional.of(cached);
+        Optional<User> result = userRepository.findById(userId);
+        result.ifPresent(u -> idCache.put(userId, u));
+        return result;
     }
 
     public List<User> findAllActive() {
@@ -62,6 +73,7 @@ public class UserService {
         user.setActive(true);
 
         userRepository.save(user);
+        idCache.clear();
     }
 
     public void updateUser(User user) {
@@ -74,10 +86,12 @@ public class UserService {
         userRepository.findById(user.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı."));
         userRepository.update(user);
+        idCache.clear();
     }
 
     public void setActive(Long userId, boolean isActive) {
         userRepository.setActive(userId, isActive);
+        idCache.clear();
     }
 
     public void deleteUser(Long userId) {
@@ -94,6 +108,7 @@ public class UserService {
         }
 
         userRepository.delete(userId);
+        idCache.clear();
     }
 
     /** Müşterinin değer puanı artık bağlı olduğu ŞİRKETTEN miras alınır. */

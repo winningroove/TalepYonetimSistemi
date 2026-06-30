@@ -6,6 +6,8 @@ import com.example.prioritization.PrioritizationService;
 import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
+import com.example.util.DateUtil;
+import com.example.util.GridSearch;
 import com.example.workflow.Workflow;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
@@ -32,6 +34,7 @@ public class ScrumMasterView extends HorizontalLayout {
     private final RequestService requestService;
     private final UserService userService;
     private final PrioritizationService prioritizationService;
+    private final com.example.company.CompanyService companyService;
 
 
     private String currentUserName;
@@ -39,11 +42,13 @@ public class ScrumMasterView extends HorizontalLayout {
 public ScrumMasterView(WorkflowService workflowService,
                        RequestService requestService,
                        UserService userService,
-                       PrioritizationService prioritizationService) {
+                       PrioritizationService prioritizationService,
+                       com.example.company.CompanyService companyService) {
     this.workflowService = workflowService;
     this.requestService = requestService;
     this.userService = userService;
     this.prioritizationService = prioritizationService;
+    this.companyService = companyService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
@@ -157,6 +162,8 @@ public ScrumMasterView(WorkflowService workflowService,
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
+        grid.addColumn(w -> talepTarihi(w.getRequestId())).setHeader("Tarih").setAutoWidth(true);
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
         grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
@@ -173,9 +180,13 @@ public ScrumMasterView(WorkflowService workflowService,
             return ataBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();
-        grid.setItems(workflowService.getAllActiveWorkflows());
 
-        mainContent.add(baslik, aciklama, grid);
+        List<Workflow> aktifGorevler = workflowService.getAllActiveWorkflows();
+        var arama = GridSearch.create(grid, aktifGorevler,
+            "Ara: talep, şirket, geliştirici, tarih...", this::gorevAranabilir);
+        grid.setItems(aktifGorevler);
+
+        mainContent.add(baslik, aciklama, arama, grid);
     }
 
     // ── Atanmamış Görevler ──
@@ -188,6 +199,8 @@ public ScrumMasterView(WorkflowService workflowService,
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
+        grid.addColumn(w -> talepTarihi(w.getRequestId())).setHeader("Tarih").setAutoWidth(true);
         grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
             Button ataBtn = new Button("Geliştirici Ata", e -> atamaDiyaloguAc(w));
@@ -195,9 +208,13 @@ public ScrumMasterView(WorkflowService workflowService,
             return ataBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();
-        grid.setItems(workflowService.getUnassignedWorkflows());
 
-        mainContent.add(baslik, aciklama, grid);
+        List<Workflow> atanmamislar = workflowService.getUnassignedWorkflows();
+        var arama = GridSearch.create(grid, atanmamislar,
+            "Ara: talep, şirket, tarih...", this::gorevAranabilir);
+        grid.setItems(atanmamislar);
+
+        mainContent.add(baslik, aciklama, arama, grid);
     }
 
     // ── Tamamlanan Görevler ──
@@ -208,8 +225,9 @@ public ScrumMasterView(WorkflowService workflowService,
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
-        grid.addColumn(w -> w.getUpdatedAt().toLocalDate()).setHeader("Tamamlanma Tarihi");
+        grid.addColumn(w -> DateUtil.format(w.getUpdatedAt())).setHeader("Tamamlanma Tarihi");
         grid.addComponentColumn(w -> durumBadge(WorkflowStatus.DONE)).setHeader("Durum");
         grid.setWidthFull();
 
@@ -217,9 +235,12 @@ public ScrumMasterView(WorkflowService workflowService,
         List<Workflow> tamamlananlar = tumGorevler.stream()
             .filter(w -> w.getWorkflowStatus() == WorkflowStatus.DONE)
             .toList();
+
+        var arama = GridSearch.create(grid, tamamlananlar,
+            "Ara: talep, şirket, geliştirici, tarih...", this::gorevAranabilir);
         grid.setItems(tamamlananlar);
 
-        mainContent.add(baslik, grid);
+        mainContent.add(baslik, arama, grid);
     }
 
     // ── Geliştirici Atama Dialogu ──
@@ -307,6 +328,28 @@ public ScrumMasterView(WorkflowService workflowService,
         return requestService.findById(requestId)
             .map(r -> r.getTitle())
             .orElse("Bilinmiyor");
+    }
+
+    private String talepTarihi(Long requestId) {
+        return requestService.findById(requestId)
+            .map(r -> DateUtil.format(r.getCreatedAt()))
+            .orElse("-");
+    }
+
+    private String sirketAdiByRequest(Long requestId) {
+        return requestService.findById(requestId)
+            .flatMap(r -> userService.findById(r.getCustomerId()))
+            .map(u -> companyService.getName(u.getCompanyId()))
+            .orElse("-");
+    }
+
+    /** Görev için aranabilir metin: talep, şirket, geliştirici, durum, tarih. */
+    private String gorevAranabilir(Workflow w) {
+        return talepBasligi(w.getRequestId())
+            + " " + sirketAdiByRequest(w.getRequestId())
+            + " " + developerAdi(w.getDeveloperId())
+            + " " + w.getWorkflowStatus().name()
+            + " " + talepTarihi(w.getRequestId());
     }
 
     private String developerAdi(Long developerId) {

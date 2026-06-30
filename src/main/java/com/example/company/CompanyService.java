@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -15,18 +17,27 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
 
+    /** Şirket adı/değeri grid'lerde sık çözüldüğü için id->Company önbelleği.
+     *  Yazma işlemleri önbelleği temizler. */
+    private final Map<Long, Company> idCache = new ConcurrentHashMap<>();
+
     public List<Company> findAll() {
         return companyRepository.findAll();
     }
 
     public Optional<Company> findById(Long companyId) {
-        return companyRepository.findById(companyId);
+        if (companyId == null) return Optional.empty();
+        Company cached = idCache.get(companyId);
+        if (cached != null) return Optional.of(cached);
+        Optional<Company> result = companyRepository.findById(companyId);
+        result.ifPresent(c -> idCache.put(companyId, c));
+        return result;
     }
 
     /** Şirket adını çözer; bulunamazsa "-" döner. Grid/etiket gösterimleri için. */
     public String getName(Long companyId) {
         if (companyId == null) return "-";
-        return companyRepository.findById(companyId)
+        return findById(companyId)
                 .map(Company::getName)
                 .orElse("-");
     }
@@ -34,7 +45,7 @@ public class CompanyService {
     /** Şirketin değer puanı; şirket veya değeri yoksa 1 (en düşük). Önceliklendirme için. */
     public int getMusteriDegeriPuan(Long companyId) {
         if (companyId == null) return 1;
-        return companyRepository.findById(companyId)
+        return findById(companyId)
                 .map(Company::getMusteriDegeri)
                 .map(MusteriDegeri::getPuan)
                 .orElse(1);
@@ -55,6 +66,7 @@ public class CompanyService {
         company.setName(trimmed);
         company.setMusteriDegeri(musteriDegeri);
         companyRepository.save(company);
+        idCache.clear();
         return companyRepository.findByName(trimmed)
                 .orElseThrow(() -> new IllegalStateException("Şirket kaydedilemedi."));
     }
@@ -78,6 +90,7 @@ public class CompanyService {
         company.setName(trimmed);
         company.setMusteriDegeri(musteriDegeri);
         companyRepository.update(company);
+        idCache.clear();
     }
 
     public void deleteCompany(Long companyId) {
@@ -90,5 +103,6 @@ public class CompanyService {
         }
 
         companyRepository.delete(companyId);
+        idCache.clear();
     }
 }

@@ -6,6 +6,8 @@ import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
 import com.example.user.User;
 import com.example.user.UserService;
+import com.example.util.DateUtil;
+import com.example.util.GridSearch;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -22,6 +24,8 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.List;
 
 @Route("admin")
 @PageTitle("Yönetim Paneli")
@@ -213,9 +217,17 @@ public class AdminView extends HorizontalLayout {
         }).setHeader("İşlem").setAutoWidth(true).setFlexGrow(0);
 
         grid.setWidthFull();
-        grid.setItems(userService.findAll());
 
-        mainContent.add(ustBar, aciklama, grid);
+        List<User> kullanicilar = userService.findAll();
+        var arama = GridSearch.create(grid, kullanicilar,
+            "Ara: ad, e-posta, rol, şirket...",
+            u -> u.getNameSurname() + " " + u.getEmail() + " " + rolLabel(u.getRole())
+                + " " + (u.getRole() == Role.CUSTOMER
+                    ? companyService.getName(u.getCompanyId()) + " " + sirketDegeriLabel(u.getCompanyId())
+                    : ""));
+        grid.setItems(kullanicilar);
+
+        mainContent.add(ustBar, aciklama, arama, grid);
     }
 
     private void yeniKullaniciDialogAc() {
@@ -353,8 +365,7 @@ public class AdminView extends HorizontalLayout {
         sirketGrid.addColumn(c -> c.getMusteriDegeri() != null
                 ? musteriDegeriLabel(c.getMusteriDegeri()) : "-")
             .setHeader("Şirket Değeri");
-        sirketGrid.addColumn(c -> c.getCreatedAt() != null
-                ? c.getCreatedAt().toLocalDate() : "-")
+        sirketGrid.addColumn(c -> DateUtil.format(c.getCreatedAt()))
             .setHeader("Oluşturulma");
         sirketGrid.addComponentColumn(c -> {
             HorizontalLayout islemler = new HorizontalLayout();
@@ -368,9 +379,16 @@ public class AdminView extends HorizontalLayout {
             return islemler;
         }).setHeader("İşlem").setAutoWidth(true).setFlexGrow(0);
         sirketGrid.setWidthFull();
-        sirketGrid.setItems(companyService.findAll());
 
-        mainContent.add(ustBar, aciklama, sirketGrid);
+        List<Company> sirketler = companyService.findAll();
+        var arama = GridSearch.create(sirketGrid, sirketler,
+            "Ara: şirket adı, değer...",
+            c -> c.getName()
+                + " " + (c.getMusteriDegeri() != null ? musteriDegeriLabel(c.getMusteriDegeri()) : "")
+                + " " + DateUtil.format(c.getCreatedAt()));
+        sirketGrid.setItems(sirketler);
+
+        mainContent.add(ustBar, arama, sirketGrid);
     }
 
     private void yeniSirketDialogAc() {

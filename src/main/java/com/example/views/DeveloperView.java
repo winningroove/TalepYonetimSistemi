@@ -7,6 +7,8 @@ import com.example.request.RequestFile;
 import com.example.request.RequestFileService;
 import com.example.request.RequestService;
 import com.example.user.UserService;
+import com.example.util.DateUtil;
+import com.example.util.GridSearch;
 import com.example.workflow.Workflow;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
@@ -34,6 +36,7 @@ public class DeveloperView extends HorizontalLayout {
     private final UserService userService;
     private final RequestFileService requestFileService;
     private final PrioritizationService prioritizationService;
+    private final com.example.company.CompanyService companyService;
 
     private Long currentUserId;
     private String currentUserName;
@@ -44,12 +47,14 @@ public class DeveloperView extends HorizontalLayout {
                          RequestService requestService,
                          UserService userService,
                          RequestFileService requestFileService,
-                         PrioritizationService prioritizationService) {
+                         PrioritizationService prioritizationService,
+                         com.example.company.CompanyService companyService) {
         this.workflowService = workflowService;
         this.requestService = requestService;
         this.userService = userService;
         this.requestFileService = requestFileService;
         this.prioritizationService = prioritizationService;
+        this.companyService = companyService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -207,19 +212,22 @@ public class DeveloperView extends HorizontalLayout {
     }).setHeader("Detay");
     grid.setWidthFull();
 
-    if (currentUserId != null) {
-        List<Workflow> gorevler = workflowService.getDeveloperWorkflows(currentUserId);
-        gorevler.sort((a, b) -> {
-            int skorA = prioritizationService.findByRequestId(a.getRequestId())
-                .map(p -> p.getPriorityScore()).orElse(0);
-            int skorB = prioritizationService.findByRequestId(b.getRequestId())
-                .map(p -> p.getPriorityScore()).orElse(0);
-            return Integer.compare(skorB, skorA);
-        });
-        grid.setItems(gorevler);
-    }
+    List<Workflow> gorevler = currentUserId != null
+        ? new java.util.ArrayList<>(workflowService.getDeveloperWorkflows(currentUserId))
+        : new java.util.ArrayList<>();
+    gorevler.sort((a, b) -> {
+        int skorA = prioritizationService.findByRequestId(a.getRequestId())
+            .map(p -> p.getPriorityScore()).orElse(0);
+        int skorB = prioritizationService.findByRequestId(b.getRequestId())
+            .map(p -> p.getPriorityScore()).orElse(0);
+        return Integer.compare(skorB, skorA);
+    });
 
-    mainContent.add(baslik, aciklama, grid);
+    var arama = GridSearch.create(grid, gorevler,
+        "Ara: talep, şirket, durum, tarih...", this::gorevAranabilir);
+    grid.setItems(gorevler);
+
+    mainContent.add(baslik, aciklama, arama, grid);
 }
    
 
@@ -231,19 +239,26 @@ public class DeveloperView extends HorizontalLayout {
 
         Grid<Workflow> grid = new Grid<>(Workflow.class, false);
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
+        grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
         grid.addComponentColumn(w -> {
             Span done = new Span("Tamamlandı");
             done.getStyle().set("color", "green").set("font-weight", "bold");
             return done;
         }).setHeader("Durum");
-        grid.addColumn(w -> w.getUpdatedAt().toLocalDate()).setHeader("Tamamlanma Tarihi");
+        grid.addColumn(w -> DateUtil.format(w.getUpdatedAt())).setHeader("Tamamlanma Tarihi");
         grid.setWidthFull();
 
-        if (currentUserId != null) {
-            grid.setItems(workflowService.getDoneWorkflowsByDeveloper(currentUserId));
-        }
+        List<Workflow> tamamlananlar = currentUserId != null
+            ? workflowService.getDoneWorkflowsByDeveloper(currentUserId)
+            : List.of();
 
-        mainContent.add(baslik, aciklama, grid);
+        var arama = GridSearch.create(grid, tamamlananlar,
+            "Ara: talep, şirket, tarih...",
+            w -> talepBasligi(w.getRequestId()) + " " + sirketAdiByRequest(w.getRequestId())
+                + " " + DateUtil.format(w.getUpdatedAt()));
+        grid.setItems(tamamlananlar);
+
+        mainContent.add(baslik, aciklama, arama, grid);
     }
 
     private Button durumGuncelleButonu(Workflow workflow) {
@@ -302,7 +317,7 @@ public class DeveloperView extends HorizontalLayout {
             icerik.add(new Span("Talep Başlığı: " + request.getTitle()));
             icerik.add(new Span("Açıklama: " + request.getDescription()));
             icerik.add(new Span("Durum: " + workflow.getWorkflowStatus()));
-            icerik.add(new Span("Tarih: " + request.getCreatedAt().toLocalDate()));
+            icerik.add(new Span("Tarih: " + DateUtil.format(request.getCreatedAt())));
 
             List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(request.getRequestId());
 
@@ -338,6 +353,23 @@ public class DeveloperView extends HorizontalLayout {
         return requestService.findById(requestId)
             .map(Request::getTitle)
             .orElse("Bilinmiyor");
+    }
+
+    private String sirketAdiByRequest(Long requestId) {
+        return requestService.findById(requestId)
+            .flatMap(r -> userService.findById(r.getCustomerId()))
+            .map(u -> companyService.getName(u.getCompanyId()))
+            .orElse("-");
+    }
+
+    /** Görev için aranabilir metin: talep başlığı, şirket, durum, talep tarihi. */
+    private String gorevAranabilir(Workflow w) {
+        String tarih = requestService.findById(w.getRequestId())
+            .map(r -> DateUtil.format(r.getCreatedAt())).orElse("");
+        return talepBasligi(w.getRequestId())
+            + " " + sirketAdiByRequest(w.getRequestId())
+            + " " + w.getWorkflowStatus().name()
+            + " " + tarih;
     }
 
     private String formatFileSize(Long bytes) {
