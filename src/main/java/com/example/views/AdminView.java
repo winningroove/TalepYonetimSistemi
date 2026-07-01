@@ -34,17 +34,27 @@ public class AdminView extends HorizontalLayout {
 
     private final UserService userService;
     private final CompanyService companyService;
+    private final com.example.notification.NotificationService notificationService;
+    private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
     private String currentUserName;
+    private Long currentUserId;
 
     private final VerticalLayout mainContent = new VerticalLayout();
     private final Grid<User> grid = new Grid<>(User.class, false);
 
-    public AdminView(UserService userService, CompanyService companyService) {
+    public AdminView(UserService userService, CompanyService companyService,
+                      com.example.notification.NotificationService notificationService,
+                      com.example.notification.NotificationBroadcaster notificationBroadcaster) {
         this.userService = userService;
         this.companyService = companyService;
+        this.notificationService = notificationService;
+        this.notificationBroadcaster = notificationBroadcaster;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
+        userService.findByEmail(email).ifPresent(u -> {
+            currentUserName = u.getNameSurname();
+            currentUserId = u.getUserId();
+        });
 
         setSizeFull();
         setPadding(false);
@@ -71,6 +81,13 @@ public class AdminView extends HorizontalLayout {
         Span altBaslik = new Span("Yönetim Paneli");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
+        HorizontalLayout bildirimSatir = new HorizontalLayout(
+            new Span("Bildirimler"),
+            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
+                reqId -> { /* şifremi unuttum bildirimlerinin ilişkili talebi yok */ }));
+        bildirimSatir.setAlignItems(Alignment.CENTER);
+        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
+
         H5 menuBaslik = new H5("Menü");
         menuBaslik.getStyle()
             .set("color", "#aaaaaa")
@@ -96,7 +113,7 @@ public class AdminView extends HorizontalLayout {
         Span kullaniciAdi = new Span(currentUserName + " (Admin)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
-        sidebar.add(baslik, altBaslik, menuBaslik, kullanicilarBtn, sirketlerBtn);
+        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, kullanicilarBtn, sirketlerBtn);
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 

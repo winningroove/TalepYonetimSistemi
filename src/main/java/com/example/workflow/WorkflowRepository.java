@@ -124,4 +124,8 @@ public class WorkflowRepository {
             "SELECT COUNT(*) FROM Eren_workflows WHERE developer_id = ?", Integer.class, developerId);
         return c != null ? c : 0;
     }
+
+    public void deleteByTaskId(Long taskId) {
+        jdbcTemplate.update("DELETE FROM Eren_workflows WHERE task_id = ?", taskId);
+    }
 }

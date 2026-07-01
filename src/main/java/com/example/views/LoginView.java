@@ -1,10 +1,19 @@
 package com.example.views;
 
+import com.example.enums.Role;
+import com.example.notification.NotificationService;
+import com.example.user.User;
+import com.example.user.UserService;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.login.LoginForm;
 import com.vaadin.flow.component.login.LoginI18n;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
@@ -17,8 +26,12 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private final LoginForm loginForm = new LoginForm();
+    private final UserService userService;
+    private final NotificationService notificationService;
 
-    public LoginView() {
+    public LoginView(UserService userService, NotificationService notificationService) {
+        this.userService = userService;
+        this.notificationService = notificationService;
         setSizeFull();
         setPadding(false);
         setSpacing(false);
@@ -80,7 +93,11 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         loginForm.setForgotPasswordButtonVisible(false);
         loginForm.setI18n(turkceI18n());
 
-        kart.add(girisBaslik, girisAlt, loginForm);
+        Button sifremiUnuttumBtn = new Button("Şifremi Unuttum", e -> sifremiUnuttumDialogAc());
+        sifremiUnuttumBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        sifremiUnuttumBtn.getStyle().set("margin-top", "8px");
+
+        kart.add(girisBaslik, girisAlt, loginForm, sifremiUnuttumBtn);
 
         // Alt bilgi notu
         Span dipNot = new Span("© 2025 Talep Yönetim Sistemi");
@@ -98,6 +115,49 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         if (event.getLocation().getQueryParameters().getParameters().containsKey("error")) {
             loginForm.setError(true);
         }
+    }
+
+    /** E-postasını soran dialog; gönderilince tüm aktif Admin'lere bildirim gider. */
+    private void sifremiUnuttumDialogAc() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Şifremi Unuttum");
+        dialog.setWidth("400px");
+
+        Paragraph aciklama = new Paragraph(
+            "E-posta adresinizi girin; sistem yöneticisine bildirim gönderilecek ve "
+            + "sizinle iletişime geçilecektir.");
+        aciklama.getStyle().set("font-size", "13px").set("color", "#555");
+
+        EmailField emailField = new EmailField("E-posta");
+        emailField.setWidthFull();
+        emailField.setRequiredIndicatorVisible(true);
+
+        Button gonderBtn = new Button("Gönder", e -> {
+            String email = emailField.getValue();
+            if (email == null || email.isBlank()) {
+                Notification.show("E-posta adresi zorunludur.", 3000, Notification.Position.MIDDLE);
+                return;
+            }
+            String kullaniciAdi = userService.findByEmail(email.trim())
+                .map(User::getNameSurname)
+                .orElse(null);
+            String mesaj = kullaniciAdi != null
+                ? kullaniciAdi + " (" + email.trim() + ") şifresini unuttu."
+                : "Bilinmeyen e-posta (" + email.trim() + ") için şifremi unuttum bildirimi.";
+
+            for (User admin : userService.findActiveByRole(Role.ADMIN)) {
+                notificationService.notify(admin.getUserId(), mesaj, null);
+            }
+
+            Notification.show("İsteğiniz sistem yöneticisine iletildi.",
+                3000, Notification.Position.TOP_CENTER);
+            dialog.close();
+        });
+        gonderBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+        dialog.add(new VerticalLayout(aciklama, emailField));
+        dialog.getFooter().add(new Button("İptal", e -> dialog.close()), gonderBtn);
+        dialog.open();
     }
 
     private LoginI18n turkceI18n() {

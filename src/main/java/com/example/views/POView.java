@@ -45,33 +45,47 @@ public class POView extends HorizontalLayout {
     private final UserService userService;
     private final RequestFileService requestFileService;
     private final com.example.company.CompanyService companyService;
+    private final com.example.message.RequestMessageService requestMessageService;
+    private final com.example.notification.NotificationService notificationService;
+    private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
 
     private String currentUserName;
+    private Long currentUserId;
 
     private final VerticalLayout mainContent = new VerticalLayout();
     private final Grid<Request> grid = new Grid<>(Request.class, false);
+    private Button gelenTaleplerBtn;
 
     public POView(RequestService requestService,
                   PrioritizationService prioritizationService,
                   WorkflowService workflowService,
                   UserService userService, RequestFileService requestFileService,
-                  com.example.company.CompanyService companyService) {
+                  com.example.company.CompanyService companyService,
+                  com.example.message.RequestMessageService requestMessageService,
+                  com.example.notification.NotificationService notificationService,
+                  com.example.notification.NotificationBroadcaster notificationBroadcaster) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
         this.userService = userService;
         this.requestFileService = requestFileService;
         this.companyService = companyService;
+        this.requestMessageService = requestMessageService;
+        this.notificationService = notificationService;
+        this.notificationBroadcaster = notificationBroadcaster;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
+        userService.findByEmail(email).ifPresent(u -> {
+            currentUserName = u.getNameSurname();
+            currentUserId = u.getUserId();
+        });
 
         setSizeFull();
         setPadding(false);
         setSpacing(false);
 
         add(buildSidebar(), buildMainContent());
-        showOnceliklendirmeHavuzu();
+        showGostergePaneli();
     }
 
     private VerticalLayout buildSidebar() {
@@ -91,16 +105,25 @@ public class POView extends HorizontalLayout {
         Span altBaslik = new Span("Ürün Sorumlusu Yönetim Paneli");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
+        HorizontalLayout bildirimSatir = new HorizontalLayout(
+            new Span("Bildirimler"),
+            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
+                this::talepVurgula));
+        bildirimSatir.setAlignItems(Alignment.CENTER);
+        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
+
         H5 menuBaslik = new H5("Menü");
         menuBaslik.getStyle()
             .set("color", "#aaaaaa")
             .set("margin-bottom", "8px")
             .set("margin-top", "24px");
 
-        Button gelenTaleplerBtn = menuButton("Gelen Talepler");
+        Button gostergeBtn      = menuButton("Gösterge Paneli");
+        gelenTaleplerBtn        = menuButton("Gelen Talepler");
         Button oncelikHavuzuBtn = menuButton("Talep Sıralaması");
         Button isAkislariBtn    = menuButton("İş Akışları (Sprint)");
 
+        gostergeBtn.addClickListener(e -> showGostergePaneli());
         gelenTaleplerBtn.addClickListener(e -> showGelenTalepler());
         oncelikHavuzuBtn.addClickListener(e -> showOnceliklendirmeHavuzu());
         isAkislariBtn.addClickListener(e -> showIsAkislari());
@@ -118,8 +141,9 @@ public class POView extends HorizontalLayout {
         Span kullaniciAdi = new Span(currentUserName + " (Ürün Sorumlusu)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
-        sidebar.add(baslik, altBaslik, menuBaslik,
-            gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
+        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik,
+            gostergeBtn, gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
+        guncelleGelenTalepButonu();
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
@@ -166,8 +190,200 @@ public class POView extends HorizontalLayout {
         return mainContent;
     }
 
+    // ── Gösterge Paneli (Dashboard) ──
+    private void showGostergePaneli() {
+        mainContent.removeAll();
+        guncelleGelenTalepButonu();
+
+        H2 baslik = new H2("Gösterge Paneli");
+        Paragraph aciklama = new Paragraph("Talep ve iş akışı istatistiklerinin özeti.");
+
+        int yeni       = requestService.getByStatus(RequestStatus.NEW).size();
+        int incelemede = requestService.getByStatus(RequestStatus.UNDER_REVIEW).size();
+        int oncelikli  = requestService.getByStatus(RequestStatus.PRIORITIZED).size();
+        List<Request> aktif = requestService.getAllActiveRequests();
+
+        long tamamlanan = workflowService.getAllWorkflows().stream()
+            .filter(w -> w.getWorkflowStatus() == WorkflowStatus.DONE).count();
+        long isAkisinda = workflowService.getAllActiveWorkflows().size();
+        int bekleyen = yeni + incelemede;
+        long kritik = aktif.stream().filter(r -> finalSkorOf(r.getRequestId()) >= 85).count();
+
+        // Üst kartlar
+        HorizontalLayout kartlar = new HorizontalLayout(
+            statKarti("Bekleyen Talep", String.valueOf(bekleyen), "#1B2A3B", this::showGelenTalepler),
+            statKarti("İş Akışında", String.valueOf(isAkisinda), "#2C6FAC", this::showIsAkislari),
+            statKarti("Tamamlanan", String.valueOf(tamamlanan), "#155724", this::showIsAkislari),
+            statKarti("Kritik Öncelikli", String.valueOf(kritik), "#721c24", this::showOnceliklendirmeHavuzu)
+        );
+        kartlar.setWidthFull();
+        kartlar.getStyle().set("flex-wrap", "wrap").set("gap", "16px");
+
+        // Talep durum dağılımı (çubuk)
+        Div durumKutu = kutu("Talep Durum Dağılımı");
+        int max = Math.max(1, Math.max(Math.max(yeni, incelemede),
+            Math.max(oncelikli, (int) tamamlanan)));
+        durumKutu.add(
+            cubukSatiri("Yeni", yeni, max, "#9aa0a6"),
+            cubukSatiri("İncelemede", incelemede, max, "#c99a06"),
+            cubukSatiri("Önceliklendirilmiş", oncelikli, max, "#2C6FAC"),
+            cubukSatiri("Tamamlanan", (int) tamamlanan, max, "#155724")
+        );
+
+        // En yüksek öncelikli 5 talep
+        Div oncelikKutu = kutu("En Yüksek Öncelikli Talepler");
+        List<Request> top = aktif.stream()
+            .filter(r -> finalSkorOf(r.getRequestId()) > 0)
+            .sorted(Comparator.comparingInt((Request r) -> finalSkorOf(r.getRequestId())).reversed())
+            .limit(5).toList();
+        if (top.isEmpty()) {
+            Span yok = new Span("Henüz skorlanmış talep yok.");
+            yok.getStyle().set("color", "#888").set("font-size", "13px");
+            oncelikKutu.add(yok);
+        } else {
+            for (Request r : top) {
+                HorizontalLayout satir = new HorizontalLayout();
+                satir.setWidthFull();
+                satir.setAlignItems(Alignment.CENTER);
+                satir.getStyle()
+                    .set("justify-content", "space-between")
+                    .set("border-bottom", "1px solid #eee").set("padding", "5px 0");
+                Span ad = new Span("#" + r.getRequestId() + " · " + r.getTitle());
+                ad.getStyle().set("font-size", "13px");
+                satir.add(ad, skorBadge(r));
+                oncelikKutu.add(satir);
+            }
+        }
+
+        HorizontalLayout altSatir = new HorizontalLayout(durumKutu, oncelikKutu);
+        altSatir.setWidthFull();
+        altSatir.getStyle().set("flex-wrap", "wrap").set("gap", "16px").set("margin-top", "16px");
+
+        mainContent.add(baslik, aciklama, kartlar, altSatir, bildirimlerBolumu());
+    }
+
+    /** Gösterge panelinin altında son bildirimler; talebi olanlara tıklanınca ilgili talep vurgulanır. */
+    private Div bildirimlerBolumu() {
+        Div box = kutu("Son Bildirimler");
+        box.getStyle().set("margin-top", "16px").set("width", "100%");
+
+        List<com.example.notification.UserNotification> bildirimler =
+            currentUserId != null ? notificationService.getRecent(currentUserId) : List.of();
+
+        if (bildirimler.isEmpty()) {
+            Span yok = new Span("Bildirim yok.");
+            yok.getStyle().set("color", "#888").set("font-size", "13px");
+            box.add(yok);
+            return box;
+        }
+
+        java.time.format.DateTimeFormatter fmt =
+            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+
+        for (com.example.notification.UserNotification n : bildirimler) {
+            Div satir = new Div();
+            satir.getStyle()
+                .set("width", "100%")
+                .set("padding", "8px 4px")
+                .set("border-bottom", "1px solid #eee")
+                .set("background", n.isRead() ? "transparent" : "#eef5ff");
+
+            Span msg = new Span(n.getMessage());
+            msg.getStyle().set("display", "block").set("font-size", "13px");
+
+            Span zaman = new Span(n.getCreatedAt().format(fmt));
+            zaman.getStyle().set("font-size", "11px").set("color", "#888");
+
+            satir.add(msg, zaman);
+
+            if (n.getRequestId() != null) {
+                satir.getStyle().set("cursor", "pointer");
+                satir.addClickListener(e -> talepVurgula(n.getRequestId()));
+            }
+
+            box.add(satir);
+        }
+        return box;
+    }
+
+    private int finalSkorOf(Long requestId) {
+        return prioritizationService.findByRequestId(requestId)
+            .filter(p -> p.getGelistiriciMudahalesi() != null)
+            .map(Prioritization::getPriorityScore)
+            .orElse(0);
+    }
+
+    private Div statKarti(String etiket, String deger, String arka, Runnable onClick) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", arka).set("color", "white")
+            .set("border-radius", "10px").set("padding", "18px 22px")
+            .set("min-width", "150px").set("flex", "1")
+            .set("cursor", "pointer")
+            .set("transition", "transform 0.1s, box-shadow 0.1s")
+            .set("box-shadow", "0 2px 6px rgba(0,0,0,0.12)");
+        Span d = new Span(deger);
+        d.getStyle().set("font-size", "32px").set("font-weight", "bold").set("display", "block");
+        Span e = new Span(etiket);
+        e.getStyle().set("font-size", "13px").set("opacity", "0.9");
+        card.add(d, e);
+        card.getElement().addEventListener("mouseover", ev ->
+            card.getStyle().set("transform", "translateY(-2px)").set("box-shadow", "0 4px 12px rgba(0,0,0,0.22)"));
+        card.getElement().addEventListener("mouseout", ev ->
+            card.getStyle().set("transform", "none").set("box-shadow", "0 2px 6px rgba(0,0,0,0.12)"));
+        if (onClick != null) {
+            card.addClickListener(ev -> onClick.run());
+        }
+        return card;
+    }
+
+    private Div kutu(String kutuBaslik) {
+        Div box = new Div();
+        box.getStyle()
+            .set("background", "white").set("border", "1px solid #e0e0e0")
+            .set("border-radius", "10px").set("padding", "16px 18px")
+            .set("flex", "1").set("min-width", "320px")
+            .set("box-shadow", "0 2px 6px rgba(0,0,0,0.06)");
+        H4 h = new H4(kutuBaslik);
+        h.getStyle().set("margin", "0 0 12px 0");
+        box.add(h);
+        return box;
+    }
+
+    private Div cubukSatiri(String etiket, int deger, int max, String renk) {
+        Div satir = new Div();
+        satir.getStyle().set("margin-bottom", "10px");
+        Span lbl = new Span(etiket + "  (" + deger + ")");
+        lbl.getStyle().set("font-size", "13px").set("display", "block").set("margin-bottom", "4px");
+        Div track = new Div();
+        track.getStyle()
+            .set("background", "#eee").set("border-radius", "6px")
+            .set("width", "100%").set("height", "18px").set("overflow", "hidden");
+        Div fill = new Div();
+        int yuzde = max > 0 ? (int) Math.round(deger * 100.0 / max) : 0;
+        fill.getStyle()
+            .set("background", renk).set("height", "100%")
+            .set("width", yuzde + "%").set("border-radius", "6px")
+            .set("min-width", deger > 0 ? "3px" : "0");
+        track.add(fill);
+        satir.add(lbl, track);
+        return satir;
+    }
+
+    /** Menüdeki "Gelen Talepler (N)" sayacını günceller. */
+    private void guncelleGelenTalepButonu() {
+        if (gelenTaleplerBtn == null) return;
+        int n = requestService.getByStatus(RequestStatus.NEW).size()
+              + requestService.getByStatus(RequestStatus.UNDER_REVIEW).size()
+              + (int) requestService.getByStatus(RequestStatus.PRIORITIZED).stream()
+                    .filter(r -> workflowService.findByRequestId(r.getRequestId()).isEmpty())
+                    .count();
+        gelenTaleplerBtn.setText("Gelen Talepler (" + n + ")");
+    }
+
     private void showGelenTalepler() {
         mainContent.removeAll();
+        guncelleGelenTalepButonu();
 
         H2 baslik = new H2("Gelen Talepler");
         Paragraph aciklama = new Paragraph(
@@ -188,6 +404,11 @@ public class POView extends HorizontalLayout {
             .setAutoWidth(true).setFlexGrow(0);
         grid.addComponentColumn(this::kopyaUyariBadge).setHeader("Kopya")
             .setAutoWidth(true).setFlexGrow(0);
+        grid.addComponentColumn(r -> {
+            Button detayBtn = new Button("Detay", e -> talepDetayDialogAc(r));
+            detayBtn.getStyle().set("font-size", "12px");
+            return detayBtn;
+        }).setHeader("Detay").setAutoWidth(true).setFlexGrow(0);
         grid.addComponentColumn(r -> gelenTalepIslemButonlari(r)).setHeader("İşlem")
             .setAutoWidth(true).setFlexGrow(0);
         grid.setWidthFull();
@@ -206,6 +427,28 @@ public class POView extends HorizontalLayout {
         grid.setItems(talepler);
 
         mainContent.add(baslik, aciklama, arama, grid);
+    }
+
+    /**
+     * Bir bildirime tıklanınca ilgili talebi "Gelen Talepler" ekranında seçip vurgular
+     * (satır seçili hale gelir ve görünür alana kaydırılır). Talep gelen talepler
+     * listesinde değilse (ör. iş akışına alınmışsa) detay penceresine düşer.
+     */
+    private void talepVurgula(Long requestId) {
+        if (requestId == null) return;
+        showGelenTalepler();
+
+        List<Request> gosterilen = grid.getListDataView().getItems().toList();
+        for (int i = 0; i < gosterilen.size(); i++) {
+            Request r = gosterilen.get(i);
+            if (r.getRequestId().equals(requestId)) {
+                grid.select(r);
+                grid.scrollToIndex(i);
+                return;
+            }
+        }
+        // Gelen taleplerde yoksa detayını göster
+        requestService.findById(requestId).ifPresent(this::talepDetayDialogAc);
     }
 
     private Span gelenTalepDurumBadge(RequestStatus status) {
@@ -348,6 +591,7 @@ public class POView extends HorizontalLayout {
 
     private void showOnceliklendirmeHavuzu() {
         mainContent.removeAll();
+        guncelleGelenTalepButonu();
 
         H2 baslik = new H2("Talep Sıralaması");
         Paragraph aciklama = new Paragraph(
@@ -480,14 +724,17 @@ public class POView extends HorizontalLayout {
                     Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
                 }
             });
+            btn.getStyle().set("white-space", "nowrap");
             layout.add(btn);
 
         } else if (r.getStatus() == RequestStatus.UNDER_REVIEW) {
             Button oncelikBtn = new Button("Önceliklendir", e -> onceliklendirmeDialogAc(r));
-            oncelikBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            oncelikBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white")
+                .set("white-space", "nowrap");
 
             Button reddetBtn = new Button("Reddet", e -> reddetDialogAc(r));
             reddetBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+            reddetBtn.getStyle().set("white-space", "nowrap");
 
             layout.add(oncelikBtn, reddetBtn);
 
@@ -510,7 +757,7 @@ public class POView extends HorizontalLayout {
                 durumLayout.add(workflowBadge(w.getWorkflowStatus()));
 
                 if (!cabaGirildi) {
-                    Span bekliyor = new Span("⏳ Çaba tahmini bekleniyor");
+                    Span bekliyor = new Span();
                     bekliyor.getStyle()
                         .set("color", "#856404")
                         .set("font-size", "12px")
@@ -532,7 +779,8 @@ public class POView extends HorizontalLayout {
                     Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
                 }
             });
-            isAkisiBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+            isAkisiBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white")
+                .set("white-space", "nowrap");
             layout.add(isAkisiBtn);
         }
     );
@@ -740,6 +988,8 @@ if (!dosyalar.isEmpty()) {
     takdirBox, skorLayout
 );
             icerik.setPadding(false);
+            // Ekip notları (SM'in geri gönderme gerekçesi dahil) burada da görünür
+            icerik.add(ekipMesajBolumu(request.getRequestId()));
 
         dialog.add(icerik);
         dialog.getFooter().add(iptalBtn, reddetBtn, kaydetBtn);
@@ -845,9 +1095,168 @@ if (!dosyalar.isEmpty()) {
             }
         }
 
+        icerik.add(mesajBolumu(r.getRequestId()));
+        icerik.add(ekipMesajBolumu(r.getRequestId()));
+
         dialog.add(icerik);
         dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
         dialog.open();
+    }
+
+    /** Ekip içi (dahili) yorum kanalı — müşteri görmez; PO/SM/Geliştirici arası. */
+    private VerticalLayout ekipMesajBolumu(Long requestId) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setPadding(false);
+        panel.setSpacing(false);
+        panel.setWidthFull();
+
+        H4 baslik = new H4("Ekip Notları (Dahili)");
+        baslik.getStyle().set("margin", "12px 0 6px 0").set("color", "#856404");
+
+        Span aciklama = new Span("Bu kanal müşteriye kapalıdır; yalnızca ürün sorumlusu, scrum master ve geliştiriciler görür.");
+        aciklama.getStyle().set("font-size", "11px").set("color", "#888").set("display", "block").set("margin-bottom", "6px");
+
+        VerticalLayout liste = new VerticalLayout();
+        liste.setPadding(false);
+        liste.setSpacing(false);
+        liste.setWidthFull();
+        liste.getStyle()
+            .set("max-height", "240px").set("overflow-y", "auto")
+            .set("background", "#fffdf5").set("border", "1px solid #ffe08a")
+            .set("border-radius", "6px").set("padding", "8px");
+
+        Runnable yukle = () -> {
+            liste.removeAll();
+            List<com.example.message.RequestMessage> mesajlar = requestMessageService.getInternalMessages(requestId);
+            if (mesajlar.isEmpty()) {
+                Span yok = new Span("Henüz ekip notu yok.");
+                yok.getStyle().set("color", "#888").set("font-size", "12px");
+                liste.add(yok);
+            } else {
+                mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
+            }
+        };
+        yukle.run();
+
+        TextArea girdi = new TextArea();
+        girdi.setPlaceholder("Ekip notu yazın...");
+        girdi.setWidthFull();
+        girdi.setMaxHeight("100px");
+
+        Button gonder = new Button("Not Ekle", e -> {
+            try {
+                requestMessageService.sendInternalMessage(requestId, currentUserId, girdi.getValue());
+                girdi.clear();
+                yukle.run();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+            }
+        });
+        gonder.getStyle().set("background-color", "#856404").set("color", "white");
+
+        HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
+        gonderSatir.setWidthFull();
+        gonderSatir.setAlignItems(Alignment.END);
+        gonderSatir.expand(girdi);
+
+        panel.add(baslik, aciklama, liste, gonderSatir);
+        return panel;
+    }
+
+    private VerticalLayout mesajBolumu(Long requestId) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setPadding(false);
+        panel.setSpacing(false);
+        panel.setWidthFull();
+
+        H4 baslik = new H4("Mesajlar");
+        baslik.getStyle().set("margin", "12px 0 6px 0");
+
+        VerticalLayout liste = new VerticalLayout();
+        liste.setPadding(false);
+        liste.setSpacing(false);
+        liste.setWidthFull();
+        liste.getStyle()
+            .set("max-height", "240px").set("overflow-y", "auto")
+            .set("background", "#f8f9fa").set("border-radius", "6px").set("padding", "8px");
+
+        Runnable yukle = () -> {
+            liste.removeAll();
+            List<com.example.message.RequestMessage> mesajlar = requestMessageService.getMessages(requestId);
+            if (mesajlar.isEmpty()) {
+                Span yok = new Span("Henüz mesaj yok.");
+                yok.getStyle().set("color", "#888").set("font-size", "12px");
+                liste.add(yok);
+            } else {
+                mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
+            }
+        };
+        yukle.run();
+
+        TextArea girdi = new TextArea();
+        girdi.setPlaceholder("Mesaj yazın...");
+        girdi.setWidthFull();
+        girdi.setMaxHeight("100px");
+
+        Button gonder = new Button("Gönder", e -> {
+            try {
+                requestMessageService.sendMessage(requestId, currentUserId, girdi.getValue());
+                girdi.clear();
+                yukle.run();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+            }
+        });
+        gonder.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+        HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
+        gonderSatir.setWidthFull();
+        gonderSatir.setAlignItems(Alignment.END);
+        gonderSatir.expand(girdi);
+
+        panel.add(baslik, liste, gonderSatir);
+        return panel;
+    }
+
+    private Div mesajBalonu(com.example.message.RequestMessage m) {
+        User sender = userService.findById(m.getSenderId()).orElse(null);
+        String ad = sender != null ? sender.getNameSurname() : "Bilinmeyen";
+        String rol = sender != null ? rolKisa(sender.getRole()) : "";
+        boolean benim = currentUserId != null && currentUserId.equals(m.getSenderId());
+
+        Div balon = new Div();
+        balon.getStyle()
+            .set("background", benim ? "#d1e7ff" : "#ffffff")
+            .set("border", "1px solid #e0e0e0").set("border-radius", "6px")
+            .set("padding", "6px 10px").set("max-width", "75%");
+
+        Span ust = new Span(ad + " · " + rol + " · " + DateUtil.format(m.getCreatedAt()));
+        ust.getStyle()
+            .set("font-size", "11px").set("color", "#666")
+            .set("font-weight", "bold").set("display", "block").set("margin-bottom", "2px");
+
+        Span govde = new Span(m.getBody());
+        govde.getStyle().set("white-space", "pre-wrap").set("font-size", "13px");
+
+        balon.add(ust, govde);
+
+        Div satir = new Div(balon);
+        satir.getStyle()
+            .set("display", "flex")
+            .set("justify-content", benim ? "flex-end" : "flex-start")
+            .set("width", "100%")
+            .set("margin-bottom", "6px");
+        return satir;
+    }
+
+    private String rolKisa(com.example.enums.Role role) {
+        return switch (role) {
+            case CUSTOMER      -> "Müşteri";
+            case PRODUCT_OWNER -> "Ürün Sorumlusu";
+            case DEVELOPER     -> "Geliştirici";
+            case SCRUM_MASTER  -> "Scrum Master";
+            case ADMIN         -> "Admin";
+        };
     }
 
     private int pipelineSirasi(Request r) {

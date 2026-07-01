@@ -18,6 +18,7 @@ import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
@@ -35,23 +36,36 @@ public class ScrumMasterView extends HorizontalLayout {
     private final UserService userService;
     private final PrioritizationService prioritizationService;
     private final com.example.company.CompanyService companyService;
+    private final com.example.message.RequestMessageService requestMessageService;
+    private final com.example.notification.NotificationService notificationService;
+    private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
 
 
     private String currentUserName;
+    private Long currentUserId;
     private final VerticalLayout mainContent = new VerticalLayout();
 public ScrumMasterView(WorkflowService workflowService,
                        RequestService requestService,
                        UserService userService,
                        PrioritizationService prioritizationService,
-                       com.example.company.CompanyService companyService) {
+                       com.example.company.CompanyService companyService,
+                       com.example.message.RequestMessageService requestMessageService,
+                       com.example.notification.NotificationService notificationService,
+                       com.example.notification.NotificationBroadcaster notificationBroadcaster) {
     this.workflowService = workflowService;
     this.requestService = requestService;
     this.userService = userService;
     this.prioritizationService = prioritizationService;
     this.companyService = companyService;
+    this.requestMessageService = requestMessageService;
+    this.notificationService = notificationService;
+    this.notificationBroadcaster = notificationBroadcaster;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        userService.findByEmail(email).ifPresent(u -> currentUserName = u.getNameSurname());
+        userService.findByEmail(email).ifPresent(u -> {
+            currentUserName = u.getNameSurname();
+            currentUserId = u.getUserId();
+        });
 
         setSizeFull();
         setPadding(false);
@@ -77,6 +91,13 @@ public ScrumMasterView(WorkflowService workflowService,
 
         Span altBaslik = new Span("Scrum Master Paneli");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
+
+        HorizontalLayout bildirimSatir = new HorizontalLayout(
+            new Span("Bildirimler"),
+            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
+                reqId -> workflowService.findByRequestId(reqId).ifPresent(this::gorevDetayDialogAc)));
+        bildirimSatir.setAlignItems(Alignment.CENTER);
+        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
 
         H5 menuBaslik = new H5("Menü");
         menuBaslik.getStyle()
@@ -105,7 +126,7 @@ public ScrumMasterView(WorkflowService workflowService,
         Span kullaniciAdi = new Span(currentUserName + " (Scrum Master)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
-        sidebar.add(baslik, altBaslik, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
+        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
@@ -179,6 +200,11 @@ public ScrumMasterView(WorkflowService workflowService,
             }
             return ataBtn;
         }).setHeader("İşlem");
+        grid.addComponentColumn(w -> {
+            Button detayBtn = new Button("Detay", e -> gorevDetayDialogAc(w));
+            detayBtn.getStyle().set("background-color", "#2C6FAC").set("color", "white");
+            return detayBtn;
+        }).setHeader("Detay").setAutoWidth(true).setFlexGrow(0);
         grid.setWidthFull();
 
         List<Workflow> aktifGorevler = workflowService.getAllActiveWorkflows();
@@ -323,6 +349,182 @@ public ScrumMasterView(WorkflowService workflowService,
     dialog.getFooter().add(iptalBtn, ataBtn);
     dialog.open();
 }
+
+    // ── Görev Detayı + Ekip Kanalı + PO'ya Geri Gönderme ──
+    private void gorevDetayDialogAc(Workflow workflow) {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("520px");
+
+        requestService.findById(workflow.getRequestId()).ifPresent(request -> {
+            dialog.setHeaderTitle("Görev Detayı — " + request.getTitle());
+
+            VerticalLayout icerik = new VerticalLayout();
+            icerik.setPadding(false);
+            icerik.setSpacing(true);
+
+            icerik.add(new Span("Şirket: " + sirketAdiByRequest(request.getRequestId())));
+            icerik.add(new Span("Geliştirici: " + developerAdi(workflow.getDeveloperId())));
+            icerik.add(new Span("Durum: " + durumBadge(workflow.getWorkflowStatus()).getText()));
+            icerik.add(new Span("Tarih: " + DateUtil.format(request.getCreatedAt())));
+
+            Paragraph aciklama = new Paragraph(request.getDescription());
+            aciklama.getStyle()
+                .set("background", "#f8f9fa").set("border-radius", "6px")
+                .set("padding", "12px").set("font-size", "13px").set("white-space", "pre-wrap");
+            icerik.add(aciklama);
+
+            icerik.add(ekipMesajBolumu(request.getRequestId()));
+
+            dialog.add(icerik);
+
+            // Sırada bekleyen (başlanmamış) görev Ürün Sorumlusuna geri gönderilebilir
+            if (workflow.getWorkflowStatus() == WorkflowStatus.BACKLOG) {
+                Button geriBtn = new Button("⬅ Ürün Sorumlusuna Geri Gönder",
+                    e -> geriGonderPODialogAc(workflow, dialog));
+                geriBtn.getStyle().set("background", "#fff3cd").set("color", "#856404");
+                dialog.getFooter().add(geriBtn);
+            }
+        });
+
+        dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
+        dialog.open();
+    }
+
+    /** Scrum Master görevi gerekçeyle Ürün Sorumlusuna geri gönderir (iş akışından çıkarır). */
+    private void geriGonderPODialogAc(Workflow workflow, Dialog parent) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Ürün Sorumlusuna Geri Gönder");
+        dialog.setWidth("460px");
+
+        Paragraph aciklama = new Paragraph(
+            "Görev iş akışından çıkarılacak ve talep tekrar 'İncelemede' durumuna dönecek. "
+            + "Ürün sorumlusu yeniden değerlendirebilir. Gerekçe ekip notlarına kaydedilir.");
+        aciklama.getStyle().set("font-size", "13px").set("color", "#555");
+
+        TextArea gerekce = new TextArea("Gerekçe");
+        gerekce.setWidthFull();
+        gerekce.setMinHeight("120px");
+
+        Button gonderBtn = new Button("Geri Gönder", e -> {
+            try {
+                workflowService.sendBackToProductOwner(
+                    workflow.getTaskId(), currentUserId, gerekce.getValue());
+                Notification.show("Talep Ürün Sorumlusuna geri gönderildi.",
+                    3000, Notification.Position.TOP_CENTER);
+                dialog.close();
+                parent.close();
+                showSprintBoard();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+            }
+        });
+        gonderBtn.getStyle().set("background-color", "#856404").set("color", "white");
+
+        dialog.add(new VerticalLayout(aciklama, gerekce));
+        dialog.getFooter().add(new Button("İptal", e -> dialog.close()), gonderBtn);
+        dialog.open();
+    }
+
+    /** Ekip içi (dahili) yorum kanalı — müşteri görmez; PO/SM/Geliştirici arası. */
+    private VerticalLayout ekipMesajBolumu(Long requestId) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setPadding(false);
+        panel.setSpacing(false);
+        panel.setWidthFull();
+
+        H4 baslik = new H4("Ekip Notları (Dahili)");
+        baslik.getStyle().set("margin", "12px 0 6px 0").set("color", "#856404");
+
+        Span aciklama = new Span("Bu kanal müşteriye kapalıdır; yalnızca ürün sorumlusu, scrum master ve geliştiriciler görür.");
+        aciklama.getStyle().set("font-size", "11px").set("color", "#888").set("display", "block").set("margin-bottom", "6px");
+
+        VerticalLayout liste = new VerticalLayout();
+        liste.setPadding(false);
+        liste.setSpacing(false);
+        liste.setWidthFull();
+        liste.getStyle()
+            .set("max-height", "240px").set("overflow-y", "auto")
+            .set("background", "#fffdf5").set("border", "1px solid #ffe08a")
+            .set("border-radius", "6px").set("padding", "8px");
+
+        Runnable yukle = () -> {
+            liste.removeAll();
+            List<com.example.message.RequestMessage> mesajlar = requestMessageService.getInternalMessages(requestId);
+            if (mesajlar.isEmpty()) {
+                Span yok = new Span("Henüz ekip notu yok.");
+                yok.getStyle().set("color", "#888").set("font-size", "12px");
+                liste.add(yok);
+            } else {
+                mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
+            }
+        };
+        yukle.run();
+
+        TextArea girdi = new TextArea();
+        girdi.setPlaceholder("Ekip notu yazın...");
+        girdi.setWidthFull();
+        girdi.setMaxHeight("100px");
+
+        Button gonder = new Button("Not Ekle", e -> {
+            try {
+                requestMessageService.sendInternalMessage(requestId, currentUserId, girdi.getValue());
+                girdi.clear();
+                yukle.run();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+            }
+        });
+        gonder.getStyle().set("background-color", "#856404").set("color", "white");
+
+        HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
+        gonderSatir.setWidthFull();
+        gonderSatir.setAlignItems(Alignment.END);
+        gonderSatir.expand(girdi);
+
+        panel.add(baslik, aciklama, liste, gonderSatir);
+        return panel;
+    }
+
+    private Div mesajBalonu(com.example.message.RequestMessage m) {
+        User sender = userService.findById(m.getSenderId()).orElse(null);
+        String ad = sender != null ? sender.getNameSurname() : "Bilinmeyen";
+        String rol = sender != null ? rolKisa(sender.getRole()) : "";
+        boolean benim = currentUserId != null && currentUserId.equals(m.getSenderId());
+
+        Div balon = new Div();
+        balon.getStyle()
+            .set("background", benim ? "#d1e7ff" : "#ffffff")
+            .set("border", "1px solid #e0e0e0").set("border-radius", "6px")
+            .set("padding", "6px 10px").set("max-width", "75%");
+
+        Span ust = new Span(ad + " · " + rol + " · " + DateUtil.format(m.getCreatedAt()));
+        ust.getStyle()
+            .set("font-size", "11px").set("color", "#666")
+            .set("font-weight", "bold").set("display", "block").set("margin-bottom", "2px");
+
+        Span govde = new Span(m.getBody());
+        govde.getStyle().set("white-space", "pre-wrap").set("font-size", "13px");
+
+        balon.add(ust, govde);
+
+        Div satir = new Div(balon);
+        satir.getStyle()
+            .set("display", "flex")
+            .set("justify-content", benim ? "flex-end" : "flex-start")
+            .set("width", "100%")
+            .set("margin-bottom", "6px");
+        return satir;
+    }
+
+    private String rolKisa(com.example.enums.Role role) {
+        return switch (role) {
+            case CUSTOMER      -> "Müşteri";
+            case PRODUCT_OWNER -> "Ürün Sorumlusu";
+            case DEVELOPER     -> "Geliştirici";
+            case SCRUM_MASTER  -> "Scrum Master";
+            case ADMIN         -> "Admin";
+        };
+    }
 
     private String talepBasligi(Long requestId) {
         return requestService.findById(requestId)

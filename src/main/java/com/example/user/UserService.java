@@ -44,6 +44,10 @@ public class UserService {
         return userRepository.findAllActive();
     }
 
+    public List<User> findActiveByRole(Role role) {
+        return userRepository.findActiveByRole(role);
+    }
+
     public void createUser(User user, String rawPassword) {
         if (user.getNameSurname() == null || user.getNameSurname().isBlank()) {
             throw new IllegalArgumentException("Ad soyad alanı boş bırakılamaz.");

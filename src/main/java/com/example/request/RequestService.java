@@ -1,7 +1,9 @@
 package com.example.request;
 
 import com.example.enums.RequestStatus;
+import com.example.enums.Role;
 import com.example.enums.YoneticiTakdiri;
+import com.example.notification.NotificationService;
 import com.example.request.RequestRepository.CredibilityStats;
 import com.example.user.User;
 import com.example.user.UserService;
@@ -20,6 +22,7 @@ public class RequestService {
     private final RequestRepository requestRepository;
     private final StatusTransitionValidator transitionValidator;
     private final UserService userService;
+    private final NotificationService notificationService;
 
     /** requestId -> talep önbelleği (SM/Geliştirici grid'lerinde talep adı/tarih çözümü için).
      *  Yazma metotları kendi doğrulamalarında repository'yi doğrudan kullanır; bu önbellek
@@ -38,6 +41,17 @@ public class RequestService {
 
         requestRepository.save(request);
         idCache.clear();
+
+        // Yeni kaydedilen talebin id'si (bildirimin talebe gidebilmesi için)
+        Long yeniTalepId = requestRepository
+            .findLastRequestIdByCustomer(request.getCustomerId())
+            .orElse(null);
+
+        // Tüm ürün sorumlularına yeni talep bildirimi
+        for (User po : userService.findActiveByRole(Role.PRODUCT_OWNER)) {
+            notificationService.notify(po.getUserId(),
+                "Yeni talep: " + request.getTitle(), yeniTalepId);
+        }
     }
 
     public List<Request> getCustomerRequests(Long customerId) {
@@ -67,6 +81,8 @@ public class RequestService {
 
         requestRepository.updateStatus(requestId, RequestStatus.UNDER_REVIEW);
         idCache.clear();
+        notificationService.notify(request.getCustomerId(),
+            "Talebiniz incelemeye alındı: " + request.getTitle(), requestId);
     }
 
     public void rejectRequest(Long requestId, String rejectionReason) {
@@ -83,6 +99,8 @@ public class RequestService {
 
         requestRepository.reject(requestId, rejectionReason);
         idCache.clear();
+        notificationService.notify(request.getCustomerId(),
+            "Talebiniz reddedildi: " + request.getTitle() + " — Gerekçe: " + rejectionReason, requestId);
     }
 
     public Optional<Long> findLastRequestIdByCustomer(Long customerId) {
@@ -98,6 +116,22 @@ public class RequestService {
         }
 
         requestRepository.updateStatus(requestId, RequestStatus.PRIORITIZED);
+        idCache.clear();
+        notificationService.notify(request.getCustomerId(),
+            "Talebiniz önceliklendirildi: " + request.getTitle(), requestId);
+    }
+
+    /** Önceliklendirilmiş talebi tekrar incelemeye döndürür (Scrum Master -> PO geri gönderme). */
+    public void revertToUnderReview(Long requestId) {
+        Request request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Talep bulunamadı."));
+
+        if (request.getStatus() != RequestStatus.PRIORITIZED) {
+            throw new IllegalStateException(
+                "Yalnızca önceliklendirilmiş talep geri gönderilebilir. Mevcut durum: " + request.getStatus());
+        }
+
+        requestRepository.updateStatus(requestId, RequestStatus.UNDER_REVIEW);
         idCache.clear();
     }
 

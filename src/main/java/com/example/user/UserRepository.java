@@ -61,6 +61,11 @@ public class UserRepository {
         return jdbcTemplate.query(sql, rowMapper);
     }
 
+    public List<User> findActiveByRole(Role role) {
+        String sql = "SELECT * FROM Eren_users WHERE role = ? AND is_active = 1 ORDER BY name_surname";
+        return jdbcTemplate.query(sql, rowMapper, role.name());
+    }
+
     public void save(User user) {
         String sql = """
             INSERT INTO Eren_users

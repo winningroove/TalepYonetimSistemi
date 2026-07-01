@@ -1,11 +1,15 @@
 package com.example.views;
 
 import com.example.enums.RequestStatus;
+import com.example.enums.Role;
 import com.example.enums.WorkflowStatus;
+import com.example.message.RequestMessage;
+import com.example.message.RequestMessageService;
 import com.example.request.Request;
 import com.example.request.RequestFile;
 import com.example.request.RequestFileService;
 import com.example.request.RequestService;
+import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
 import com.example.util.GridSearch;
@@ -44,15 +48,24 @@ public class CustomerView extends HorizontalLayout {
     private final Grid<Request> grid = new Grid<>(Request.class, false);
     private final RequestFileService requestFileService;
     private final WorkflowService workflowService;
+    private final RequestMessageService requestMessageService;
+    private final com.example.notification.NotificationService notificationService;
+    private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
 
 public CustomerView(RequestService requestService,
                     UserService userService,
                     RequestFileService requestFileService,
-                    WorkflowService workflowService) {
+                    WorkflowService workflowService,
+                    RequestMessageService requestMessageService,
+                    com.example.notification.NotificationService notificationService,
+                    com.example.notification.NotificationBroadcaster notificationBroadcaster) {
     this.requestService = requestService;
     this.userService = userService;
     this.requestFileService = requestFileService;
     this.workflowService = workflowService;
+    this.requestMessageService = requestMessageService;
+    this.notificationService = notificationService;
+    this.notificationBroadcaster = notificationBroadcaster;
 
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -87,6 +100,13 @@ public CustomerView(RequestService requestService,
         Span altBaslik = new Span("Müşteri Portalı");
         altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
 
+        HorizontalLayout bildirimSatir = new HorizontalLayout(
+            new Span("Bildirimler"),
+            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
+                reqId -> requestService.findById(reqId).ifPresent(this::detayDialogAc)));
+        bildirimSatir.setAlignItems(Alignment.CENTER);
+        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
+
         // Menü
         H5 menuBaslik = new H5("Menü");
         menuBaslik.getStyle().set("color", "#aaaaaa").set("margin-bottom", "8px").set("margin-top", "24px");
@@ -111,7 +131,7 @@ public CustomerView(RequestService requestService,
         Span kullaniciAdi = new Span(currentUserName + " (Müşteri)");
         kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
 
-        sidebar.add(baslik, altBaslik, menuBaslik, yeniTalepBtn, taleplerimBtn);
+        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
         sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
 
@@ -288,6 +308,9 @@ public CustomerView(RequestService requestService,
         }
     }
 
+    icerik.add(mesajBolumu(request.getRequestId()));
+
+    dialog.setWidth("520px");
     dialog.add(icerik);
     dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
     dialog.open();
@@ -302,6 +325,102 @@ private String formatFileSize(Long bytes) {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
     return (bytes / (1024 * 1024)) + " MB";
+}
+
+private VerticalLayout mesajBolumu(Long requestId) {
+    VerticalLayout panel = new VerticalLayout();
+    panel.setPadding(false);
+    panel.setSpacing(false);
+    panel.setWidthFull();
+
+    H4 baslik = new H4("Mesajlar");
+    baslik.getStyle().set("margin", "12px 0 6px 0");
+
+    VerticalLayout liste = new VerticalLayout();
+    liste.setPadding(false);
+    liste.setSpacing(false);
+    liste.setWidthFull();
+    liste.getStyle()
+        .set("max-height", "240px").set("overflow-y", "auto")
+        .set("background", "#f8f9fa").set("border-radius", "6px").set("padding", "8px");
+
+    Runnable yukle = () -> {
+        liste.removeAll();
+        List<RequestMessage> mesajlar = requestMessageService.getMessages(requestId);
+        if (mesajlar.isEmpty()) {
+            Span yok = new Span("Henüz mesaj yok.");
+            yok.getStyle().set("color", "#888").set("font-size", "12px");
+            liste.add(yok);
+        } else {
+            mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
+        }
+    };
+    yukle.run();
+
+    TextArea girdi = new TextArea();
+    girdi.setPlaceholder("Mesaj yazın...");
+    girdi.setWidthFull();
+    girdi.setMaxHeight("100px");
+
+    Button gonder = new Button("Gönder", e -> {
+        try {
+            requestMessageService.sendMessage(requestId, currentUserId, girdi.getValue());
+            girdi.clear();
+            yukle.run();
+        } catch (Exception ex) {
+            Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
+        }
+    });
+    gonder.getStyle().set("background-color", "#1B2A3B").set("color", "white");
+
+    HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
+    gonderSatir.setWidthFull();
+    gonderSatir.setAlignItems(Alignment.END);
+    gonderSatir.expand(girdi);
+
+    panel.add(baslik, liste, gonderSatir);
+    return panel;
+}
+
+private Div mesajBalonu(RequestMessage m) {
+    User sender = userService.findById(m.getSenderId()).orElse(null);
+    String ad = sender != null ? sender.getNameSurname() : "Bilinmeyen";
+    String rol = sender != null ? rolKisa(sender.getRole()) : "";
+    boolean benim = currentUserId != null && currentUserId.equals(m.getSenderId());
+
+    Div balon = new Div();
+    balon.getStyle()
+        .set("background", benim ? "#d1e7ff" : "#ffffff")
+        .set("border", "1px solid #e0e0e0").set("border-radius", "6px")
+        .set("padding", "6px 10px").set("max-width", "75%");
+
+    Span ust = new Span(ad + " · " + rol + " · " + DateUtil.format(m.getCreatedAt()));
+    ust.getStyle()
+        .set("font-size", "11px").set("color", "#666")
+        .set("font-weight", "bold").set("display", "block").set("margin-bottom", "2px");
+
+    Span govde = new Span(m.getBody());
+    govde.getStyle().set("white-space", "pre-wrap").set("font-size", "13px");
+
+    balon.add(ust, govde);
+
+    Div satir = new Div(balon);
+    satir.getStyle()
+        .set("display", "flex")
+        .set("justify-content", benim ? "flex-end" : "flex-start")
+        .set("width", "100%")
+        .set("margin-bottom", "6px");
+    return satir;
+}
+
+private String rolKisa(Role role) {
+    return switch (role) {
+        case CUSTOMER      -> "Müşteri";
+        case PRODUCT_OWNER -> "Ürün Sorumlusu";
+        case DEVELOPER     -> "Geliştirici";
+        case SCRUM_MASTER  -> "Scrum Master";
+        case ADMIN         -> "Admin";
+    };
 }
 
     private String durumLabel(RequestStatus status) {
