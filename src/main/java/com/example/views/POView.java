@@ -95,9 +95,14 @@ public class POView extends HorizontalLayout {
         sidebar.setPadding(true);
         sidebar.setSpacing(false);
         sidebar.getStyle()
-            .set("background-color", "#1B2A3B")
+            .set("background-image",
+                "linear-gradient(180deg, rgba(3,107,170,0.92) 0%, rgba(2,74,120,0.95) 100%)")
+            .set("backdrop-filter", "blur(16px)")
+            .set("-webkit-backdrop-filter", "blur(16px)")
             .set("color", "white")
-            .set("flex-shrink", "0");
+            .set("flex-shrink", "0")
+            .set("border-right", "1px solid rgba(255,255,255,0.08)")
+            .set("box-shadow", "6px 0 30px rgba(15,23,35,0.28)");
 
         H3 baslik = new H3("Talep Yönetim Sistemi");
         baslik.getStyle().set("color", "white").set("margin-top", "0");
@@ -166,7 +171,7 @@ public class POView extends HorizontalLayout {
             .set("font-size", "13px")
             .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
         btn.getElement().addEventListener("mouseover", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid rgba(255,255,255,0.9)"));
         btn.getElement().addEventListener("mouseout", e ->
             btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
@@ -212,7 +217,7 @@ public class POView extends HorizontalLayout {
         // Üst kartlar
         HorizontalLayout kartlar = new HorizontalLayout(
             statKarti("Bekleyen Talep", String.valueOf(bekleyen), "#1B2A3B", this::showGelenTalepler),
-            statKarti("İş Akışında", String.valueOf(isAkisinda), "#2C6FAC", this::showIsAkislari),
+            statKarti("İş Akışında", String.valueOf(isAkisinda), "#036baa", this::showIsAkislari),
             statKarti("Tamamlanan", String.valueOf(tamamlanan), "#155724", this::showIsAkislari),
             statKarti("Kritik Öncelikli", String.valueOf(kritik), "#721c24", this::showOnceliklendirmeHavuzu)
         );
@@ -226,7 +231,7 @@ public class POView extends HorizontalLayout {
         durumKutu.add(
             cubukSatiri("Yeni", yeni, max, "#9aa0a6"),
             cubukSatiri("İncelemede", incelemede, max, "#c99a06"),
-            cubukSatiri("Önceliklendirilmiş", oncelikli, max, "#2C6FAC"),
+            cubukSatiri("Önceliklendirilmiş", oncelikli, max, "#036baa"),
             cubukSatiri("Tamamlanan", (int) tamamlanan, max, "#155724")
         );
 
@@ -320,7 +325,7 @@ public class POView extends HorizontalLayout {
             .set("border-radius", "10px").set("padding", "18px 22px")
             .set("min-width", "150px").set("flex", "1")
             .set("cursor", "pointer")
-            .set("transition", "transform 0.1s, box-shadow 0.1s")
+            .set("transition", "transform 0.18s ease, box-shadow 0.18s ease")
             .set("box-shadow", "0 2px 6px rgba(0,0,0,0.12)");
         Span d = new Span(deger);
         d.getStyle().set("font-size", "32px").set("font-weight", "bold").set("display", "block");
@@ -339,6 +344,7 @@ public class POView extends HorizontalLayout {
 
     private Div kutu(String kutuBaslik) {
         Div box = new Div();
+        box.addClassName("ui-card");
         box.getStyle()
             .set("background", "white").set("border", "1px solid #e0e0e0")
             .set("border-radius", "10px").set("padding", "16px 18px")
@@ -814,7 +820,7 @@ public class POView extends HorizontalLayout {
             prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
 
         Span musteriDegeriSpan = new Span("Şirket Değeri: " + musteriDegeriLabel);
-        musteriDegeriSpan.getStyle().set("color", "#2C6FAC").set("font-weight", "bold");
+        musteriDegeriSpan.getStyle().set("color", "#036baa").set("font-weight", "bold");
 
         // Requester Credibility (güvenilirlik) — talep sahibinin geçmiş performansı
         var credStats = requestService.getCredibilityStats(request.getCustomerId());

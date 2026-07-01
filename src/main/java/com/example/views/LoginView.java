@@ -41,7 +41,9 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         getStyle()
             .set("background-color", "#1B2A3B")
             .set("background-image",
-                "radial-gradient(ellipse at 60% 40%, #22364a 0%, #1B2A3B 70%)")
+                "radial-gradient(circle at 22% 18%, rgba(3,107,170,0.38) 0%, transparent 46%), "
+                + "radial-gradient(circle at 82% 85%, rgba(3,107,170,0.20) 0%, transparent 42%), "
+                + "linear-gradient(135deg, #1B2A3B 0%, #16222f 100%)")
             .set("min-height", "100vh");
 
         // Üst marka alanı
@@ -67,12 +69,16 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         kart.setSpacing(false);
         kart.setAlignItems(FlexComponent.Alignment.CENTER);
         kart.getStyle()
-            .set("background-color", "#ffffff")
-            .set("border-radius", "16px")
+            .set("background-color", "rgba(255,255,255,0.92)")
+            .set("backdrop-filter", "blur(16px) saturate(1.2)")
+            .set("-webkit-backdrop-filter", "blur(16px) saturate(1.2)")
+            .set("border", "1px solid rgba(255,255,255,0.6)")
+            .set("border-radius", "20px")
             .set("padding", "40px 48px")
-            .set("box-shadow", "0 8px 40px rgba(0,0,0,0.35)")
+            .set("box-shadow", "0 24px 70px rgba(0,0,0,0.45)")
             .set("width", "420px")
-            .set("max-width", "92vw");
+            .set("max-width", "92vw")
+            .set("animation", "uiFadeIn .45s ease");
 
         H2 girisBaslik = new H2("Hoş Geldiniz");
         girisBaslik.getStyle()

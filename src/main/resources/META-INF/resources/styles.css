@@ -1,1 +1,169 @@
-/* Add your styles here */
+/* =========================================================
+   Talep Yönetim Sistemi — modern UI iyileştirmeleri
+   Renk paleti korunur (#1B2A3B lacivert, #036baa mavi).
+   Amaç: yumuşak geçişler, cam (glassmorphism) yüzeyler, ince gölgeler.
+   ========================================================= */
+
+html {
+  --app-navy: #1B2A3B;
+  --app-blue: #036baa;
+  --app-blue-light: #0a86cf;
+
+  /* Vaadin token'ları (tema destekliyorsa): birincil renk + yuvarlaklık */
+  --lumo-primary-color: #036baa;
+  --lumo-primary-text-color: #036baa;
+  --lumo-primary-color-50pct: rgba(3, 107, 170, 0.5);
+  --lumo-primary-color-10pct: rgba(3, 107, 170, 0.1);
+  --lumo-border-radius-s: 6px;
+  --lumo-border-radius-m: 9px;
+  --lumo-border-radius-l: 14px;
+  --lumo-font-family: 'Segoe UI', system-ui, -apple-system, 'Inter', Roboto, sans-serif;
+
+  scroll-behavior: smooth;
+}
+
+/* --- Genel tipografi & yazı yumuşatma --- */
+html, body {
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Inter', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Yumuşak degrade zemin — cam yüzeylerin ve kartların okunması/derinliği için */
+  background: linear-gradient(135deg, #e9eef5 0%, #d9e2ee 100%) !important;
+}
+h1, h2, h3, h4, h5 { letter-spacing: -0.01em; }
+
+/* --- Modern, ince kaydırma çubuğu --- */
+* { scrollbar-width: thin; scrollbar-color: rgba(27, 42, 59, 0.28) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(27, 42, 59, 0.25);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(27, 42, 59, 0.45);
+  background-clip: padding-box;
+}
+
+/* --- Yumuşak giriş animasyonu --- */
+@keyframes uiFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Butonlar: yuvarlak köşe + yumuşak hover yükselmesi --- */
+vaadin-button {
+  border-radius: 9px !important;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease, background-color .16s ease !important;
+}
+vaadin-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(27, 42, 59, 0.22);
+  filter: brightness(1.06);
+}
+vaadin-button:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+
+/* Birincil (primary) butonlar: canlı mavi gradyan */
+vaadin-button[theme~="primary"] {
+  background: linear-gradient(135deg, #0a86cf 0%, #036baa 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(3, 107, 170, 0.32) !important;
+}
+vaadin-button[theme~="primary"]:hover {
+  box-shadow: 0 8px 20px rgba(3, 107, 170, 0.42) !important;
+}
+
+/* --- Form alanları: yuvarlak, ince kenar, belirgin odak --- */
+vaadin-text-field::part(input-field),
+vaadin-text-area::part(input-field),
+vaadin-email-field::part(input-field),
+vaadin-password-field::part(input-field),
+vaadin-combo-box::part(input-field),
+vaadin-number-field::part(input-field) {
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(27, 42, 59, 0.12);
+  transition: box-shadow .2s ease, background .2s ease;
+}
+vaadin-text-field[focused]::part(input-field),
+vaadin-text-area[focused]::part(input-field),
+vaadin-email-field[focused]::part(input-field),
+vaadin-password-field[focused]::part(input-field),
+vaadin-combo-box[focused]::part(input-field) {
+  box-shadow: inset 0 0 0 2px #036baa;
+  background: #ffffff;
+}
+
+/* --- Grid: yuvarlak çerçeve, yumuşak gölge, temiz başlık, satır hover --- */
+vaadin-grid {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(27, 42, 59, 0.08);
+  box-shadow: 0 4px 18px rgba(27, 42, 59, 0.06);
+}
+vaadin-grid::part(header-cell) {
+  background: #eef3f9;
+  font-weight: 600;
+}
+vaadin-grid::part(row):hover {
+  background: rgba(3, 107, 170, 0.06);
+}
+
+/* --- Dialog: cam (frosted glass) yüzey + yumuşak açılış --- */
+vaadin-dialog-overlay::part(overlay),
+vaadin-confirm-dialog-overlay::part(overlay) {
+  border-radius: 20px !important;
+  box-shadow: 0 30px 80px rgba(15, 23, 35, 0.42) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  animation: uiFadeIn .24s ease;
+}
+vaadin-dialog-overlay::part(backdrop),
+vaadin-confirm-dialog-overlay::part(backdrop) {
+  background: rgba(15, 23, 35, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Açılır menü / combobox / bildirim yüzeyleri de camsı */
+vaadin-menu-bar-overlay::part(overlay),
+vaadin-context-menu-overlay::part(overlay),
+vaadin-select-overlay::part(overlay) {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: 0 14px 40px rgba(15, 23, 35, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* --- Bildirim kartları --- */
+vaadin-notification-card {
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 35, 0.25);
+  overflow: hidden;
+}
+
+/* --- ComboBox açılır liste --- */
+vaadin-combo-box-overlay::part(overlay) {
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(15, 23, 35, 0.2);
+}
+
+/* --- Genel kart yardımcı sınıfı (gösterge paneli kartları / kutular) --- */
+.ui-card {
+  transition: transform .18s ease, box-shadow .18s ease !important;
+}
+.ui-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(27, 42, 59, 0.16) !important;
+}

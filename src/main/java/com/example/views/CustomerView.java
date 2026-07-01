@@ -89,9 +89,14 @@ public CustomerView(RequestService requestService,
         sidebar.setPadding(true);
         sidebar.setSpacing(false);
         sidebar.getStyle()
-            .set("background-color", "#1B2A3B")
+            .set("background-image",
+                "linear-gradient(180deg, rgba(3,107,170,0.92) 0%, rgba(2,74,120,0.95) 100%)")
+            .set("backdrop-filter", "blur(16px)")
+            .set("-webkit-backdrop-filter", "blur(16px)")
             .set("color", "white")
-            .set("flex-shrink", "0");
+            .set("flex-shrink", "0")
+            .set("border-right", "1px solid rgba(255,255,255,0.08)")
+            .set("box-shadow", "6px 0 30px rgba(15,23,35,0.28)");
 
         // Başlık
         H3 baslik = new H3("Talep Yönetim Sistemi");
@@ -154,7 +159,7 @@ public CustomerView(RequestService requestService,
             .set("font-size", "13px")
             .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
         btn.getElement().addEventListener("mouseover", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid #4A9EDF"));
+            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid rgba(255,255,255,0.9)"));
         btn.getElement().addEventListener("mouseout", e ->
             btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
         return btn;
