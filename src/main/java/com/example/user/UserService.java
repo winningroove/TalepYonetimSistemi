@@ -93,6 +93,21 @@ public class UserService {
         idCache.clear();
     }
 
+    /** Kullanıcının kendi şifresini değiştirmesi: mevcut şifre doğrulanır, yeni şifre BCrypt ile saklanır. */
+    public void changeOwnPassword(Long userId, String currentRaw, String newRaw) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı."));
+        if (currentRaw == null || currentRaw.isBlank()
+                || !passwordEncoder.matches(currentRaw, user.getPassword())) {
+            throw new IllegalArgumentException("Mevcut şifre hatalı.");
+        }
+        if (newRaw == null || newRaw.length() < 4) {
+            throw new IllegalArgumentException("Yeni şifre en az 4 karakter olmalıdır.");
+        }
+        userRepository.updatePassword(userId, passwordEncoder.encode(newRaw));
+        idCache.clear();
+    }
+
     public void setActive(Long userId, boolean isActive) {
         userRepository.setActive(userId, isActive);
         idCache.clear();

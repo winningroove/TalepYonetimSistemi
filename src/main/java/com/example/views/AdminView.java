@@ -36,6 +36,7 @@ public class AdminView extends HorizontalLayout {
     private final CompanyService companyService;
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
+    private final com.example.activity.ActivityLogService activityLogService;
     private String currentUserName;
     private Long currentUserId;
 
@@ -44,11 +45,13 @@ public class AdminView extends HorizontalLayout {
 
     public AdminView(UserService userService, CompanyService companyService,
                       com.example.notification.NotificationService notificationService,
-                      com.example.notification.NotificationBroadcaster notificationBroadcaster) {
+                      com.example.notification.NotificationBroadcaster notificationBroadcaster,
+                      com.example.activity.ActivityLogService activityLogService) {
         this.userService = userService;
         this.companyService = companyService;
         this.notificationService = notificationService;
         this.notificationBroadcaster = notificationBroadcaster;
+        this.activityLogService = activityLogService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -112,15 +115,14 @@ public class AdminView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giriş Yapan:");
-        girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
-
-        Span kullaniciAdi = new Span(currentUserName + " (Admin)");
-        kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
+        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+            currentUserName, "Admin",
+            () -> userService.findById(currentUserId).ifPresent(u ->
+                com.example.user.ProfileDialog.open(u, companyService, activityLogService, null, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, kullanicilarBtn, sirketlerBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, buildLogoutButton());
 
         return sidebar;
     }

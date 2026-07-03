@@ -23,6 +23,7 @@ public class RequestService {
     private final StatusTransitionValidator transitionValidator;
     private final UserService userService;
     private final NotificationService notificationService;
+    private final com.example.activity.ActivityLogService activityLogService;
 
     /** requestId -> talep önbelleği (SM/Geliştirici grid'lerinde talep adı/tarih çözümü için).
      *  Yazma metotları kendi doğrulamalarında repository'yi doğrudan kullanır; bu önbellek
@@ -52,6 +53,8 @@ public class RequestService {
             notificationService.notify(po.getUserId(),
                 "Yeni talep: " + request.getTitle(), yeniTalepId);
         }
+
+        activityLogService.log(yeniTalepId, "Talep oluşturuldu", null);
     }
 
     public List<Request> getCustomerRequests(Long customerId) {
@@ -83,6 +86,7 @@ public class RequestService {
         idCache.clear();
         notificationService.notify(request.getCustomerId(),
             "Talebiniz incelemeye alındı: " + request.getTitle(), requestId);
+        activityLogService.log(requestId, "İncelemeye alındı", null);
     }
 
     public void rejectRequest(Long requestId, String rejectionReason) {
@@ -101,6 +105,7 @@ public class RequestService {
         idCache.clear();
         notificationService.notify(request.getCustomerId(),
             "Talebiniz reddedildi: " + request.getTitle() + " — Gerekçe: " + rejectionReason, requestId);
+        activityLogService.log(requestId, "Reddedildi", "Gerekçe: " + rejectionReason);
     }
 
     public Optional<Long> findLastRequestIdByCustomer(Long customerId) {
@@ -119,6 +124,7 @@ public class RequestService {
         idCache.clear();
         notificationService.notify(request.getCustomerId(),
             "Talebiniz önceliklendirildi: " + request.getTitle(), requestId);
+        activityLogService.log(requestId, "Önceliklendirildi", null);
     }
 
     /** Önceliklendirilmiş talebi tekrar incelemeye döndürür (Scrum Master -> PO geri gönderme). */
@@ -187,6 +193,8 @@ public class RequestService {
 
         requestRepository.markAsDuplicate(duplicateId, canonicalId);
         idCache.clear();
+        activityLogService.log(duplicateId, "Kopya olarak birleştirildi", "Ana talep #" + canonicalId);
+        activityLogService.log(canonicalId, "Kopya talep birleştirildi", "Birleştirilen talep #" + duplicateId);
     }
 
     private boolean isActive(RequestStatus status) {

@@ -48,6 +48,7 @@ public class POView extends HorizontalLayout {
     private final com.example.message.RequestMessageService requestMessageService;
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
+    private final com.example.activity.ActivityLogService activityLogService;
 
     private String currentUserName;
     private Long currentUserId;
@@ -63,7 +64,8 @@ public class POView extends HorizontalLayout {
                   com.example.company.CompanyService companyService,
                   com.example.message.RequestMessageService requestMessageService,
                   com.example.notification.NotificationService notificationService,
-                  com.example.notification.NotificationBroadcaster notificationBroadcaster) {
+                  com.example.notification.NotificationBroadcaster notificationBroadcaster,
+                  com.example.activity.ActivityLogService activityLogService) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
@@ -73,6 +75,7 @@ public class POView extends HorizontalLayout {
         this.requestMessageService = requestMessageService;
         this.notificationService = notificationService;
         this.notificationBroadcaster = notificationBroadcaster;
+        this.activityLogService = activityLogService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -140,17 +143,16 @@ public class POView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giriş Yapan:");
-        girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
-
-        Span kullaniciAdi = new Span(currentUserName + " (Ürün Sorumlusu)");
-        kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
+        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+            currentUserName, "Ürün Sorumlusu",
+            () -> userService.findById(currentUserId).ifPresent(u ->
+                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik,
             gostergeBtn, gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
         guncelleGelenTalepButonu();
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, buildLogoutButton());
 
         return sidebar;
     }
@@ -664,6 +666,11 @@ public class POView extends HorizontalLayout {
                 .map(w -> workflowBadge(w.getWorkflowStatus()))
                 .orElse(new Span("-"))
         ).setHeader("Durum");
+        isAkisiGrid.addComponentColumn(r -> {
+            Button detayBtn = new Button("Detay", e -> talepDetayDialogAc(r));
+            detayBtn.getStyle().set("font-size", "12px");
+            return detayBtn;
+        }).setHeader("Detay").setAutoWidth(true).setFlexGrow(0);
         isAkisiGrid.setWidthFull();
 
         List<Request> isAkisindakiler = requestService.getAllActiveRequests().stream()
@@ -1103,6 +1110,9 @@ if (!dosyalar.isEmpty()) {
 
         icerik.add(mesajBolumu(r.getRequestId()));
         icerik.add(ekipMesajBolumu(r.getRequestId()));
+        icerik.add(new com.example.activity.ActivityTimeline(
+            activityLogService.getByRequestId(r.getRequestId()),
+            id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
 
         dialog.add(icerik);
         dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));

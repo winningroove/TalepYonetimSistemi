@@ -37,6 +37,20 @@ public final class GridSearch {
         field.setValueChangeTimeout(200);
         field.setWidth("340px");
         field.setPrefixComponent(VaadinIcon.SEARCH.create());
+        // Tarayıcı otomatik doldurmasının (kayıtlı giriş bilgileri) bu arama
+        // kutusuna kayıtlı bir kullanıcı adı/e-posta önermesini engeller.
+        // Not: Chrome autocomplete="off" özelliğini şifre alanı olan sayfalarda
+        // yok sayabiliyor; bu yüzden alanı odaklanana kadar salt-okunur yapıp
+        // (tarayıcılar salt-okunur alanları otomatik doldurmaz) ilk tıklamada
+        // anında (client-side) düzenlenebilir hale getiriyoruz.
+        field.getElement().setAttribute("autocomplete", "off");
+        field.getElement().setAttribute("name", "grid-search-" + System.identityHashCode(field));
+        field.getElement().setAttribute("readonly", true);
+        field.getElement().executeJs(
+            "const el = this; "
+            + "el.addEventListener('focus', () => el.removeAttribute('readonly'), { once: true }); "
+            + "el.addEventListener('mousedown', () => el.removeAttribute('readonly'), { once: true });"
+        );
 
         field.addValueChangeListener(e -> {
             String q = e.getValue() == null ? "" : e.getValue().trim().toLowerCase();

@@ -51,6 +51,8 @@ public class CustomerView extends HorizontalLayout {
     private final RequestMessageService requestMessageService;
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
+    private final com.example.activity.ActivityLogService activityLogService;
+    private final com.example.company.CompanyService companyService;
 
 public CustomerView(RequestService requestService,
                     UserService userService,
@@ -58,7 +60,9 @@ public CustomerView(RequestService requestService,
                     WorkflowService workflowService,
                     RequestMessageService requestMessageService,
                     com.example.notification.NotificationService notificationService,
-                    com.example.notification.NotificationBroadcaster notificationBroadcaster) {
+                    com.example.notification.NotificationBroadcaster notificationBroadcaster,
+                    com.example.activity.ActivityLogService activityLogService,
+                    com.example.company.CompanyService companyService) {
     this.requestService = requestService;
     this.userService = userService;
     this.requestFileService = requestFileService;
@@ -66,6 +70,8 @@ public CustomerView(RequestService requestService,
     this.requestMessageService = requestMessageService;
     this.notificationService = notificationService;
     this.notificationBroadcaster = notificationBroadcaster;
+    this.activityLogService = activityLogService;
+    this.companyService = companyService;
 
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -130,15 +136,14 @@ public CustomerView(RequestService requestService,
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giriş Yapan:");
-        girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
-
-        Span kullaniciAdi = new Span(currentUserName + " (Müşteri)");
-        kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
+        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+            currentUserName, "Müşteri",
+            () -> userService.findById(currentUserId).ifPresent(u ->
+                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
-        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, buildLogoutButton());
 
         return sidebar;
     }
@@ -314,6 +319,9 @@ public CustomerView(RequestService requestService,
     }
 
     icerik.add(mesajBolumu(request.getRequestId()));
+    icerik.add(new com.example.activity.ActivityTimeline(
+        activityLogService.getByRequestId(request.getRequestId()),
+        id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
 
     dialog.setWidth("520px");
     dialog.add(icerik);

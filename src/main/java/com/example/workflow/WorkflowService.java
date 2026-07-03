@@ -28,6 +28,7 @@ public class WorkflowService {
     private final UserService userService;
     /** Geri gönderme gerekçesini ekip kanalına dahili mesaj olarak işlemek için (repo -> döngü olmaz). */
     private final RequestMessageRepository requestMessageRepository;
+    private final com.example.activity.ActivityLogService activityLogService;
 
     /** requestId -> iş akışı önbelleği. Grid'lerde satır başına çağrıldığı için.
      *  Yoklukları da (Optional.empty) saklar; her yazma işlemi temizler. */
@@ -62,6 +63,7 @@ public class WorkflowService {
         requestService.findById(requestId).ifPresent(r ->
             notificationService.notify(r.getCustomerId(),
                 "Talebiniz iş akışına alındı: " + r.getTitle(), requestId));
+        activityLogService.log(requestId, "İş akışına alındı", null);
     }
 
     public List<Workflow> getDoneWorkflowsByDeveloper(Long developerId) {
@@ -88,7 +90,20 @@ public class WorkflowService {
             requestService.findById(workflow.getRequestId()).ifPresent(r ->
                 notificationService.notify(r.getCustomerId(),
                     "Talebiniz tamamlandı: " + r.getTitle(), workflow.getRequestId()));
+            activityLogService.log(workflow.getRequestId(), "Tamamlandı", null);
+        } else {
+            activityLogService.log(workflow.getRequestId(), "Durum güncellendi",
+                durumTr(workflow.getWorkflowStatus()) + " → " + durumTr(newStatus));
         }
+    }
+
+    private String durumTr(WorkflowStatus s) {
+        return switch (s) {
+            case BACKLOG     -> "Sırada";
+            case IN_PROGRESS -> "Devam Ediyor";
+            case TESTING     -> "Test Aşamasında";
+            case DONE        -> "Tamamlandı";
+        };
     }
 
     public List<Workflow> getAllActiveWorkflows() {
@@ -106,10 +121,14 @@ public class WorkflowService {
         }
         byRequestCache.clear();
 
-        workflowRepository.findByTaskId(taskId).ifPresent(w ->
+        workflowRepository.findByTaskId(taskId).ifPresent(w -> {
             requestService.findById(w.getRequestId()).ifPresent(r ->
                 notificationService.notify(developerId,
-                    "Size yeni görev atandı: " + r.getTitle(), w.getRequestId())));
+                    "Size yeni görev atandı: " + r.getTitle(), w.getRequestId()));
+            String devAd = userService.findById(developerId)
+                .map(User::getNameSurname).orElse("Geliştirici");
+            activityLogService.log(w.getRequestId(), "Geliştirici atandı", devAd);
+        });
     }
 
     /**
@@ -135,6 +154,7 @@ public class WorkflowService {
 
         kaydetDahiliMesaj(w.getRequestId(), byUserId,
             "🔙 Scrum Master'a geri gönderildi. Gerekçe: " + reason.trim());
+        activityLogService.log(w.getRequestId(), "Scrum Master'a geri gönderildi", "Gerekçe: " + reason.trim());
 
         requestService.findById(w.getRequestId()).ifPresent(r -> {
             for (User sm : userService.findActiveByRole(Role.SCRUM_MASTER)) {
@@ -168,6 +188,7 @@ public class WorkflowService {
 
         kaydetDahiliMesaj(requestId, byUserId,
             "🔙 Ürün Sorumlusuna geri gönderildi (iş akışından çıkarıldı). Gerekçe: " + reason.trim());
+        activityLogService.log(requestId, "Ürün Sorumlusuna geri gönderildi", "Gerekçe: " + reason.trim());
 
         requestService.findById(requestId).ifPresent(r -> {
             for (User po : userService.findActiveByRole(Role.PRODUCT_OWNER)) {

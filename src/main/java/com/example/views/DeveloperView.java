@@ -42,6 +42,7 @@ public class DeveloperView extends HorizontalLayout {
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
     private final com.example.message.RequestMessageService requestMessageService;
+    private final com.example.activity.ActivityLogService activityLogService;
 
     private Long currentUserId;
     private String currentUserName;
@@ -56,7 +57,8 @@ public class DeveloperView extends HorizontalLayout {
                          com.example.company.CompanyService companyService,
                          com.example.notification.NotificationService notificationService,
                          com.example.notification.NotificationBroadcaster notificationBroadcaster,
-                         com.example.message.RequestMessageService requestMessageService) {
+                         com.example.message.RequestMessageService requestMessageService,
+                         com.example.activity.ActivityLogService activityLogService) {
         this.workflowService = workflowService;
         this.requestService = requestService;
         this.userService = userService;
@@ -66,6 +68,7 @@ public class DeveloperView extends HorizontalLayout {
         this.notificationService = notificationService;
         this.notificationBroadcaster = notificationBroadcaster;
         this.requestMessageService = requestMessageService;
+        this.activityLogService = activityLogService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -129,15 +132,14 @@ public class DeveloperView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giriş Yapan:");
-        girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
-
-        Span kullaniciAdi = new Span(currentUserName + " (Geliştirici)");
-        kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
+        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+            currentUserName, "Geliştirici",
+            () -> userService.findById(currentUserId).ifPresent(u ->
+                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, gorevlerimBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, buildLogoutButton());
 
         return sidebar;
     }
@@ -366,6 +368,9 @@ public class DeveloperView extends HorizontalLayout {
             }
 
             icerik.add(ekipMesajBolumu(request.getRequestId()));
+            icerik.add(new com.example.activity.ActivityTimeline(
+                activityLogService.getByRequestId(request.getRequestId()),
+                id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
 
             dialog.add(icerik);
 

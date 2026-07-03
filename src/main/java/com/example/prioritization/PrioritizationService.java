@@ -37,10 +37,10 @@ public class PrioritizationService {
 
     public int calculateBeklemeSuresiPuan(LocalDateTime createdAt) {
         long gun = Math.min(30, ChronoUnit.DAYS.between(createdAt, LocalDateTime.now()));
-        if (gun >= 30) return 5;
-        if (gun >= 14) return 4;
-        if (gun >= 7)  return 3;
-        if (gun >= 3)  return 2;
+        if (gun >= 30) return 15;
+        if (gun >= 14) return 10;
+        if (gun >= 7)  return 8;
+        if (gun >= 3)  return 5;
         return 1;
     }
 

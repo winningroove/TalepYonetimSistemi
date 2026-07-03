@@ -39,6 +39,7 @@ public class ScrumMasterView extends HorizontalLayout {
     private final com.example.message.RequestMessageService requestMessageService;
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
+    private final com.example.activity.ActivityLogService activityLogService;
 
 
     private String currentUserName;
@@ -51,7 +52,8 @@ public ScrumMasterView(WorkflowService workflowService,
                        com.example.company.CompanyService companyService,
                        com.example.message.RequestMessageService requestMessageService,
                        com.example.notification.NotificationService notificationService,
-                       com.example.notification.NotificationBroadcaster notificationBroadcaster) {
+                       com.example.notification.NotificationBroadcaster notificationBroadcaster,
+                       com.example.activity.ActivityLogService activityLogService) {
     this.workflowService = workflowService;
     this.requestService = requestService;
     this.userService = userService;
@@ -60,6 +62,7 @@ public ScrumMasterView(WorkflowService workflowService,
     this.requestMessageService = requestMessageService;
     this.notificationService = notificationService;
     this.notificationBroadcaster = notificationBroadcaster;
+    this.activityLogService = activityLogService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -125,15 +128,14 @@ public ScrumMasterView(WorkflowService workflowService,
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        Span girisYapan = new Span("Giriş Yapan:");
-        girisYapan.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("display", "block");
-
-        Span kullaniciAdi = new Span(currentUserName + " (Scrum Master)");
-        kullaniciAdi.getStyle().set("color", "white").set("font-size", "13px");
+        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+            currentUserName, "Scrum Master",
+            () -> userService.findById(currentUserId).ifPresent(u ->
+                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, girisYapan, kullaniciAdi, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, buildLogoutButton());
 
         return sidebar;
     }
@@ -379,6 +381,9 @@ public ScrumMasterView(WorkflowService workflowService,
             icerik.add(aciklama);
 
             icerik.add(ekipMesajBolumu(request.getRequestId()));
+            icerik.add(new com.example.activity.ActivityTimeline(
+                activityLogService.getByRequestId(request.getRequestId()),
+                id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
 
             dialog.add(icerik);
 
