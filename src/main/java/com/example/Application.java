@@ -1,5 +1,6 @@
 package com.example;
 
+import com.vaadin.flow.theme.aura.Aura;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,10 +8,10 @@ import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.component.page.Push;
 
-// Tema belirtilmediğinde Vaadin varsayılan olarak LUMO temasını kullanır.
-// (Aura kaldırıldı -> Lumo. styles.css'teki --lumo-* değişkenleri artık etkin.)
+// Aura teması: özel CSS ve inline stiller bu tabana göre ayarlandı.
 @SpringBootApplication
-@StyleSheet("styles.css?v=4") // Özel stiller (Lumo tabanı üzerine)
+@StyleSheet(Aura.STYLESHEET)
+@StyleSheet("styles.css?v=5") // Özel stiller (v ile önbellek kırma)
 @Push
 public class Application implements AppShellConfigurator {
 

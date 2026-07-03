@@ -902,6 +902,21 @@ public class POView extends HorizontalLayout {
         Span labelSpan = new Span("");
         skorSpan.getStyle().set("font-weight", "bold").set("font-size", "16px");
 
+        // Skor dağılımı (çarpan etkileri) — her faktörün skora katkısı canlı gösterilir
+        Div dagilimBox = new Div();
+        dagilimBox.setVisible(false);
+        dagilimBox.getStyle()
+            .set("background", "rgba(3,107,170,0.05)")
+            .set("border", "1px solid rgba(3,107,170,0.20)")
+            .set("border-radius", "10px")
+            .set("padding", "12px 14px")
+            .set("margin-top", "4px");
+        Span dagilimBaslik = new Span("Skor Dağılımı (çarpan etkileri)");
+        dagilimBaslik.getStyle().set("font-weight", "700").set("display", "block")
+            .set("margin-bottom", "8px").set("color", "#036baa").set("font-size", "13px");
+        Div dagilimIcerik = new Div();
+        dagilimBox.add(dagilimBaslik, dagilimIcerik);
+
         Runnable skorGuncelle = () -> {
             if (isEtkisiBox.getValue() != null && acilyetBox.getValue() != null
                     && isTipiBox.getValue() != null && takdirBox.getValue() != null) {
@@ -912,14 +927,47 @@ public class POView extends HorizontalLayout {
                 temp.setMusteriDegeriPuan(musteriDegeriPuan);
                 temp.setIsTipi(isTipiBox.getValue());
                 temp.setIsTipiPuan(isTipiBox.getValue().getPuan());
-                temp.setBeklemeSuresiPuan(
-                    prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt()));
+                int beklemePuan = prioritizationService.calculateBeklemeSuresiPuan(request.getCreatedAt());
+                temp.setBeklemeSuresiPuan(beklemePuan);
                 temp.setGelistiriciMudahalesi(GelistiriciMudahalesi.ORTA);
 
                 int credibility = prioritizationService.calculateCredibilityScore(request.getCustomerId());
-                int skor = prioritizationService.calculateFinalScore(temp, takdirBox.getValue(), credibility);
+                YoneticiTakdiri takdir = takdirBox.getValue();
+                int takdirPuan = takdir != null ? takdir.getPuan() : 0;
+                int skor = prioritizationService.calculateFinalScore(temp, takdir, credibility);
                 skorSpan.setText("Tahmini Skor: " + skor);
                 labelSpan.setText(" — " + prioritizationService.getLabel(skor));
+
+                // Ağırlıklar (30/25/20/15/10) ÷ 5 baz skoru verir. Her satır o faktörün
+                // baz skora net katkısını gösterir; altta eklemeli düzelticiler yer alır.
+                int isEtkisiKatki = isEtkisiBox.getValue() * 30 / 5;
+                int aciliyetKatki = acilyetBox.getValue() * 25 / 5;
+                int sirketKatki   = musteriDegeriPuan * 20 / 5;
+                int isTipiKatki   = isTipiBox.getValue().getPuan() * 15 / 5;
+                int beklemeKatki  = beklemePuan * 10 / 5;
+                int bazSkor = isEtkisiKatki + aciliyetKatki + sirketKatki + isTipiKatki + beklemeKatki;
+
+                dagilimIcerik.removeAll();
+                dagilimIcerik.add(
+                    dagilimSatiri("İş Etkisi",       isEtkisiBox.getValue() + " × 30 ÷ 5", "+" + isEtkisiKatki, false),
+                    dagilimSatiri("Aciliyet",        acilyetBox.getValue() + " × 25 ÷ 5",  "+" + aciliyetKatki, false),
+                    dagilimSatiri("Şirket Değeri",   musteriDegeriPuan + " × 20 ÷ 5",      "+" + sirketKatki,   false),
+                    dagilimSatiri("İş Tipi",         isTipiBox.getValue().getPuan() + " × 15 ÷ 5", "+" + isTipiKatki, false),
+                    dagilimSatiri("Bekleme Süresi",  beklemePuan + " × 10 ÷ 5",            "+" + beklemeKatki,  false),
+                    dagilimAyrac(),
+                    dagilimSatiri("Baz Skor",        "", String.valueOf(bazSkor), true),
+                    dagilimSatiri("Yönetici Takdiri", takdir != null ? takdirKisa(takdir) : "", isaretli(takdirPuan), false),
+                    dagilimSatiri("Güvenilirlik",    "", isaretli(credibility), false),
+                    dagilimSatiri("Geliştirici Müdahalesi", "SM girecek", "0", false),
+                    dagilimAyrac(),
+                    dagilimSatiri("Toplam (0–100)",  "", String.valueOf(skor), true)
+                );
+                dagilimBox.setVisible(true);
+            } else {
+                dagilimIcerik.removeAll();
+                dagilimBox.setVisible(false);
+                skorSpan.setText("Tahmini Skor: —");
+                labelSpan.setText("");
             }
         };
 
@@ -998,7 +1046,7 @@ if (!dosyalar.isEmpty()) {
     talepBaslikSpan, beklemeSuresi, musteriDegeriSpan, credibilitySpan, smNotu,
     dosyaLayout,                    // bunu ekle
     isEtkisiBox, acilyetBox, isTipiBox,
-    takdirBox, skorLayout
+    takdirBox, skorLayout, dagilimBox
 );
             icerik.setPadding(false);
             // Ekip notları (SM'in geri gönderme gerekçesi dahil) burada da görünür
@@ -1007,6 +1055,47 @@ if (!dosyalar.isEmpty()) {
         dialog.add(icerik);
         dialog.getFooter().add(iptalBtn, reddetBtn, kaydetBtn);
         dialog.open();
+    }
+
+    /** Skor dağılımı tablosunda tek satır: faktör adı — hesap — katkı. */
+    private Div dagilimSatiri(String etiket, String hesap, String katki, boolean vurgu) {
+        Span e = new Span(etiket);
+        e.getStyle().set("flex", "1").set("font-size", "13px");
+        if (vurgu) e.getStyle().set("font-weight", "700");
+
+        Span h = new Span(hesap);
+        h.getStyle().set("color", "#7a8794").set("font-size", "11px").set("margin", "0 10px");
+
+        Span k = new Span(katki);
+        k.getStyle().set("min-width", "44px").set("text-align", "right")
+            .set("font-weight", vurgu ? "700" : "600").set("font-size", "13px");
+        if (vurgu) k.getStyle().set("color", "#036baa");
+
+        Div row = new Div(e, h, k);
+        row.getStyle().set("display", "flex").set("align-items", "baseline").set("padding", "3px 0");
+        return row;
+    }
+
+    /** Skor dağılımı içinde ince ayraç çizgisi. */
+    private Div dagilimAyrac() {
+        Div d = new Div();
+        d.getStyle().set("border-top", "1px solid rgba(3,107,170,0.20)").set("margin", "5px 0");
+        return d;
+    }
+
+    /** Eklemeli düzeltici puanı işaretli metne çevirir (+5 / 0 / -10). */
+    private String isaretli(int v) {
+        return v > 0 ? "+" + v : String.valueOf(v);
+    }
+
+    /** Yönetici takdirinin dağılım satırında görünecek kısa etiketi. */
+    private String takdirKisa(YoneticiTakdiri t) {
+        return switch (t) {
+            case YOK       -> "Normal";
+            case ONEMLI    -> "Önemli";
+            case STRATEJIK -> "Stratejik";
+            case KRITIK    -> "Kritik";
+        };
     }
 
     private Span workflowBadge(WorkflowStatus status) {
