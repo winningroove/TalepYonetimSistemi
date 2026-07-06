@@ -1,4 +1,4 @@
-package com.example.user;
+package com.example.dialog;
 
 import com.example.activity.ActivityLog;
 import com.example.activity.ActivityLogService;
@@ -6,6 +6,8 @@ import com.example.company.CompanyService;
 import com.example.enums.Role;
 import com.example.request.Request;
 import com.example.request.RequestService;
+import com.example.user.User;
+import com.example.user.UserService;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;

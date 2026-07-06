@@ -1,5 +1,6 @@
 package com.example.views;
 
+import com.example.dialog.DevGorevDetayDialog;
 import com.example.enums.WorkflowStatus;
 import com.example.prioritization.PrioritizationService;
 import com.example.request.Request;
@@ -109,7 +110,9 @@ public class DeveloperView extends HorizontalLayout {
         HorizontalLayout bildirimSatir = new HorizontalLayout(
             new Span("Bildirimler"),
             new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
-                reqId -> workflowService.findByRequestId(reqId).ifPresent(this::gorevDetayDialogAc)));
+                reqId -> workflowService.findByRequestId(reqId).ifPresent(w -> DevGorevDetayDialog.open(
+                    w, currentUserId, this::showGorevlerim, requestService, requestFileService,
+                    requestMessageService, userService, activityLogService, workflowService))));
         bildirimSatir.setAlignItems(Alignment.CENTER);
         bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
 
@@ -132,10 +135,10 @@ public class DeveloperView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+        HorizontalLayout profilSatiri = com.example.dialog.ProfileDialog.sidebarProfileRow(
             currentUserName, "Geliştirici",
             () -> userService.findById(currentUserId).ifPresent(u ->
-                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
+                com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, gorevlerimBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
@@ -231,7 +234,9 @@ public class DeveloperView extends HorizontalLayout {
     }).setHeader("Öncelik");
     grid.addComponentColumn(this::durumGuncelleButonu).setHeader("İşlem");
     grid.addComponentColumn(w -> {
-        Button detayBtn = new Button("Detay", e -> gorevDetayDialogAc(w));
+        Button detayBtn = new Button("Detay", e -> DevGorevDetayDialog.open(
+            w, currentUserId, this::showGorevlerim, requestService, requestFileService,
+            requestMessageService, userService, activityLogService, workflowService));
         detayBtn.getStyle().set("background-color", "#036baa").set("color", "white");
         return detayBtn;
     }).setHeader("Detay");
@@ -330,200 +335,6 @@ public class DeveloperView extends HorizontalLayout {
 }
     
 
-    private void gorevDetayDialogAc(Workflow workflow) {
-        Dialog dialog = new Dialog();
-
-        requestService.findById(workflow.getRequestId()).ifPresent(request -> {
-            dialog.setHeaderTitle("Görev Detayı — " + request.getTitle());
-
-            VerticalLayout icerik = new VerticalLayout();
-            icerik.setPadding(false);
-
-            icerik.add(new Span("Talep Başlığı: " + request.getTitle()));
-            icerik.add(new Span("Açıklama: " + request.getDescription()));
-            icerik.add(new Span("Durum: " + workflow.getWorkflowStatus()));
-            icerik.add(new Span("Tarih: " + DateUtil.format(request.getCreatedAt())));
-
-            List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(request.getRequestId());
-
-            H4 dosyaBaslik = new H4("Ekli Dosyalar");
-            dosyaBaslik.getStyle().set("margin-top", "16px").set("margin-bottom", "4px");
-            icerik.add(dosyaBaslik);
-
-            if (!dosyalar.isEmpty()) {
-                for (RequestFile dosya : dosyalar) {
-                    Anchor link = new Anchor(
-                        "data:application/octet-stream;base64," +
-                        java.util.Base64.getEncoder().encodeToString(dosya.getFileData()),
-                        "📎 " + dosya.getFileName() + " (" + formatFileSize(dosya.getFileSize()) + ")"
-                    );
-                    link.getElement().setAttribute("download", dosya.getFileName());
-                    link.getStyle().set("display", "block").set("margin-bottom", "4px");
-                    icerik.add(link);
-                }
-            } else {
-                Span yok = new Span("Ekli dosya yok.");
-                yok.getStyle().set("color", "#888").set("font-size", "12px");
-                icerik.add(yok);
-            }
-
-            icerik.add(ekipMesajBolumu(request.getRequestId()));
-            icerik.add(new com.example.activity.ActivityTimeline(
-                activityLogService.getByRequestId(request.getRequestId()),
-                id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
-
-            dialog.add(icerik);
-
-            // Başlanmış görev (Devam/Test) Scrum Master'a geri gönderilebilir
-            WorkflowStatus durum = workflow.getWorkflowStatus();
-            if (durum == WorkflowStatus.IN_PROGRESS || durum == WorkflowStatus.TESTING) {
-                Button geriBtn = new Button("⬅ Scrum Master'a Geri Gönder",
-                    e -> geriGonderSMDialogAc(workflow, dialog));
-                geriBtn.getStyle().set("background", "#fff3cd").set("color", "#856404");
-                dialog.getFooter().add(geriBtn);
-            }
-        });
-
-        dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
-        dialog.open();
-    }
-
-    /** Geliştirici görevi gerekçeyle Scrum Master'a geri gönderir. */
-    private void geriGonderSMDialogAc(Workflow workflow, Dialog parent) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Scrum Master'a Geri Gönder");
-        dialog.setWidth("460px");
-
-        Paragraph aciklama = new Paragraph(
-            "Görev tekrar 'Sırada' durumuna dönecek ve Scrum Master'a bildirilecek. "
-            + "Gerekçe ekip notlarına kaydedilir.");
-        aciklama.getStyle().set("font-size", "13px").set("color", "#555");
-
-        TextArea gerekce = new TextArea("Gerekçe");
-        gerekce.setWidthFull();
-        gerekce.setMinHeight("120px");
-
-        Button gonderBtn = new Button("Geri Gönder", e -> {
-            try {
-                workflowService.sendBackToScrumMaster(
-                    workflow.getTaskId(), workflow.getVersion(), currentUserId, gerekce.getValue());
-                Notification.show("Görev Scrum Master'a geri gönderildi.",
-                    3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                parent.close();
-                showGorevlerim();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        gonderBtn.getStyle().set("background-color", "#856404").set("color", "white");
-
-        dialog.add(new VerticalLayout(aciklama, gerekce));
-        dialog.getFooter().add(new Button("İptal", e -> dialog.close()), gonderBtn);
-        dialog.open();
-    }
-
-    /** Ekip içi (dahili) yorum kanalı — müşteri görmez; PO/SM/Geliştirici arası. */
-    private VerticalLayout ekipMesajBolumu(Long requestId) {
-        VerticalLayout panel = new VerticalLayout();
-        panel.setPadding(false);
-        panel.setSpacing(false);
-        panel.setWidthFull();
-
-        H4 baslik = new H4("Ekip Notları (Dahili)");
-        baslik.getStyle().set("margin", "12px 0 6px 0").set("color", "#856404");
-
-        Span aciklama = new Span("Bu kanal müşteriye kapalıdır; yalnızca ürün sorumlusu, scrum master ve geliştiriciler görür.");
-        aciklama.getStyle().set("font-size", "11px").set("color", "#888").set("display", "block").set("margin-bottom", "6px");
-
-        VerticalLayout liste = new VerticalLayout();
-        liste.setPadding(false);
-        liste.setSpacing(false);
-        liste.setWidthFull();
-        liste.getStyle()
-            .set("max-height", "240px").set("overflow-y", "auto")
-            .set("background", "#fffdf5").set("border", "1px solid #ffe08a")
-            .set("border-radius", "6px").set("padding", "8px");
-
-        Runnable yukle = () -> {
-            liste.removeAll();
-            List<com.example.message.RequestMessage> mesajlar = requestMessageService.getInternalMessages(requestId);
-            if (mesajlar.isEmpty()) {
-                Span yok = new Span("Henüz ekip notu yok.");
-                yok.getStyle().set("color", "#888").set("font-size", "12px");
-                liste.add(yok);
-            } else {
-                mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
-            }
-        };
-        yukle.run();
-
-        TextArea girdi = new TextArea();
-        girdi.setPlaceholder("Ekip notu yazın...");
-        girdi.setWidthFull();
-        girdi.setMaxHeight("100px");
-
-        Button gonder = new Button("Not Ekle", e -> {
-            try {
-                requestMessageService.sendInternalMessage(requestId, currentUserId, girdi.getValue());
-                girdi.clear();
-                yukle.run();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        gonder.getStyle().set("background-color", "#856404").set("color", "white");
-
-        HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
-        gonderSatir.setWidthFull();
-        gonderSatir.setAlignItems(Alignment.END);
-        gonderSatir.expand(girdi);
-
-        panel.add(baslik, aciklama, liste, gonderSatir);
-        return panel;
-    }
-
-    private Div mesajBalonu(com.example.message.RequestMessage m) {
-        User sender = userService.findById(m.getSenderId()).orElse(null);
-        String ad = sender != null ? sender.getNameSurname() : "Bilinmeyen";
-        String rol = sender != null ? rolKisa(sender.getRole()) : "";
-        boolean benim = currentUserId != null && currentUserId.equals(m.getSenderId());
-
-        Div balon = new Div();
-        balon.getStyle()
-            .set("background", benim ? "#d1e7ff" : "#ffffff")
-            .set("border", "1px solid #e0e0e0").set("border-radius", "6px")
-            .set("padding", "6px 10px").set("max-width", "75%");
-
-        Span ust = new Span(ad + " · " + rol + " · " + DateUtil.format(m.getCreatedAt()));
-        ust.getStyle()
-            .set("font-size", "11px").set("color", "#666")
-            .set("font-weight", "bold").set("display", "block").set("margin-bottom", "2px");
-
-        Span govde = new Span(m.getBody());
-        govde.getStyle().set("white-space", "pre-wrap").set("font-size", "13px");
-
-        balon.add(ust, govde);
-
-        Div satir = new Div(balon);
-        satir.getStyle()
-            .set("display", "flex")
-            .set("justify-content", benim ? "flex-end" : "flex-start")
-            .set("width", "100%")
-            .set("margin-bottom", "6px");
-        return satir;
-    }
-
-    private String rolKisa(com.example.enums.Role role) {
-        return switch (role) {
-            case CUSTOMER      -> "Müşteri";
-            case PRODUCT_OWNER -> "Ürün Sorumlusu";
-            case DEVELOPER     -> "Geliştirici";
-            case SCRUM_MASTER  -> "Scrum Master";
-            case ADMIN         -> "Admin";
-        };
-    }
-
     private String talepBasligi(Long requestId) {
         return requestService.findById(requestId)
             .map(Request::getTitle)
@@ -545,12 +356,6 @@ public class DeveloperView extends HorizontalLayout {
             + " " + sirketAdiByRequest(w.getRequestId())
             + " " + w.getWorkflowStatus().name()
             + " " + tarih;
-    }
-
-    private String formatFileSize(Long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
-        return (bytes / (1024 * 1024)) + " MB";
     }
 
     private Span durumBadge(WorkflowStatus status) {

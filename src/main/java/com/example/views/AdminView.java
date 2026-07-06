@@ -2,6 +2,9 @@ package com.example.views;
 
 import com.example.company.Company;
 import com.example.company.CompanyService;
+import com.example.dialog.KullaniciDialog;
+import com.example.dialog.OnayDialog;
+import com.example.dialog.SirketDialog;
 import com.example.enums.MusteriDegeri;
 import com.example.enums.Role;
 import com.example.user.User;
@@ -115,10 +118,10 @@ public class AdminView extends HorizontalLayout {
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+        HorizontalLayout profilSatiri = com.example.dialog.ProfileDialog.sidebarProfileRow(
             currentUserName, "Admin",
             () -> userService.findById(currentUserId).ifPresent(u ->
-                com.example.user.ProfileDialog.open(u, companyService, activityLogService, null, userService)));
+                com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, null, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, kullanicilarBtn, sirketlerBtn);
         sidebar.addAndExpand(new Div());
@@ -174,7 +177,9 @@ public class AdminView extends HorizontalLayout {
         Paragraph aciklama = new Paragraph(
             "Sistemdeki tüm kullanıcılar. Pasife alınan kullanıcılar giriş yapamaz.");
 
-        Button yeniKullaniciBtn = new Button("+ Yeni Kullanıcı Ekle", e -> yeniKullaniciDialogAc());
+        Button yeniKullaniciBtn = new Button("+ Yeni Kullanıcı Ekle",
+            e -> KullaniciDialog.yeni(companyService, userService, this::showKullanicilar,
+                this::rolLabel, this::musteriDegeriLabel));
         yeniKullaniciBtn.getStyle()
             .set("background-color", "#1B2A3B")
             .set("color", "white");
@@ -230,10 +235,16 @@ public class AdminView extends HorizontalLayout {
                 toggleBtn.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
             }
 
-            Button duzenleBtn = new Button("Düzenle", e -> duzenleDialogAc(u));
+            Button duzenleBtn = new Button("Düzenle",
+                e -> KullaniciDialog.duzenle(u, companyService, userService, this::showKullanicilar,
+                    this::rolLabel, this::musteriDegeriLabel));
             duzenleBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
 
-            Button silBtn = new Button("Sil", e -> kullaniciSilOnay(u));
+            Button silBtn = new Button("Sil", e -> OnayDialog.open("Kullanıcıyı Sil",
+                "\"" + u.getNameSurname() + "\" kullanıcısını kalıcı olarak silmek istediğinize emin misiniz? "
+                    + "Bu işlem geri alınamaz.",
+                "Kullanıcı silindi.", this::showKullanicilar,
+                () -> userService.deleteUser(u.getUserId())));
             silBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             islemler.add(toggleBtn, duzenleBtn, silBtn);
@@ -254,129 +265,14 @@ public class AdminView extends HorizontalLayout {
         mainContent.add(ustBar, aciklama, arama, grid);
     }
 
-    private void yeniKullaniciDialogAc() {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Yeni Kullanıcı Ekle");
-        dialog.setWidth("420px");
-
-        TextField adSoyadField = new TextField("Ad Soyad");
-        adSoyadField.setWidthFull();
-
-        EmailField emailField = new EmailField("E-posta");
-        emailField.setWidthFull();
-
-        PasswordField sifreField = new PasswordField("Şifre");
-        sifreField.setWidthFull();
-
-        ComboBox<Role> rolBox = new ComboBox<>("Rol");
-        rolBox.setItems(Role.values());
-        rolBox.setItemLabelGenerator(this::rolLabel);
-        rolBox.setWidthFull();
-
-        ComboBox<Company> sirketBox = new ComboBox<>("Şirket");
-        sirketBox.setItems(companyService.findAll());
-        sirketBox.setItemLabelGenerator(c -> c.getName()
-            + (c.getMusteriDegeri() != null ? " (" + musteriDegeriLabel(c.getMusteriDegeri()) + ")" : ""));
-        sirketBox.setWidthFull();
-        sirketBox.setVisible(false);
-
-        rolBox.addValueChangeListener(e -> {
-            boolean isCustomer = e.getValue() != null && e.getValue() == Role.CUSTOMER;
-            sirketBox.setVisible(isCustomer);
-            if (!isCustomer) {
-                sirketBox.clear();
-            }
-        });
-
-        Button kaydetBtn = new Button("Kaydet", e -> {
-            try {
-                User user = new User();
-                user.setNameSurname(adSoyadField.getValue());
-                user.setEmail(emailField.getValue());
-                user.setRole(rolBox.getValue());
-                user.setCompanyId(sirketBox.isVisible() && sirketBox.getValue() != null
-                    ? sirketBox.getValue().getCompanyId() : null);
-
-                userService.createUser(user, sifreField.getValue());
-                Notification.show("Kullanıcı oluşturuldu.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showKullanicilar();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        kaydetBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(new VerticalLayout(adSoyadField, emailField, sifreField, rolBox, sirketBox));
-        dialog.getFooter().add(iptalBtn, kaydetBtn);
-        dialog.open();
-    }
-
-    private void duzenleDialogAc(User user) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Kullanıcı Düzenle — " + user.getNameSurname());
-        dialog.setWidth("420px");
-
-        TextField adSoyadField = new TextField("Ad Soyad");
-        adSoyadField.setValue(user.getNameSurname());
-        adSoyadField.setWidthFull();
-
-        EmailField emailField = new EmailField("E-posta");
-        emailField.setValue(user.getEmail());
-        emailField.setWidthFull();
-
-        Span rolBilgi = new Span("Rol: " + rolLabel(user.getRole()));
-        rolBilgi.getStyle().set("color", "#666").set("font-size", "13px");
-
-        ComboBox<Company> sirketBox = new ComboBox<>("Şirket");
-        sirketBox.setItems(companyService.findAll());
-        sirketBox.setItemLabelGenerator(c -> c.getName()
-            + (c.getMusteriDegeri() != null ? " (" + musteriDegeriLabel(c.getMusteriDegeri()) + ")" : ""));
-        sirketBox.setWidthFull();
-
-        if (user.getRole() == Role.CUSTOMER) {
-            sirketBox.setVisible(true);
-            if (user.getCompanyId() != null) {
-                companyService.findById(user.getCompanyId()).ifPresent(sirketBox::setValue);
-            }
-        } else {
-            sirketBox.setVisible(false);
-        }
-
-        Button kaydetBtn = new Button("Kaydet", e -> {
-            try {
-                user.setNameSurname(adSoyadField.getValue());
-                user.setEmail(emailField.getValue());
-                if (user.getRole() == Role.CUSTOMER) {
-                    user.setCompanyId(sirketBox.getValue() != null
-                        ? sirketBox.getValue().getCompanyId() : null);
-                }
-                userService.updateUser(user);
-                Notification.show("Kullanıcı güncellendi.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showKullanicilar();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        kaydetBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(new VerticalLayout(rolBilgi, adSoyadField, emailField, sirketBox));
-        dialog.getFooter().add(iptalBtn, kaydetBtn);
-        dialog.open();
-    }
-
     private void showSirketler() {
         mainContent.removeAll();
 
         H2 baslik = new H2("Şirket Yönetimi");
         
 
-        Button yeniSirketBtn = new Button("+ Yeni Şirket Ekle", e -> yeniSirketDialogAc());
+        Button yeniSirketBtn = new Button("+ Yeni Şirket Ekle",
+            e -> SirketDialog.yeni(companyService, this::showSirketler, this::musteriDegeriLabel));
         yeniSirketBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
 
         HorizontalLayout ustBar = new HorizontalLayout(baslik, yeniSirketBtn);
@@ -395,9 +291,14 @@ public class AdminView extends HorizontalLayout {
             HorizontalLayout islemler = new HorizontalLayout();
             islemler.setPadding(false);
             islemler.getStyle().set("flex-wrap", "nowrap");
-            Button duzenleBtn = new Button("Düzenle", e -> sirketDuzenleDialogAc(c));
+            Button duzenleBtn = new Button("Düzenle",
+                e -> SirketDialog.duzenle(c, companyService, this::showSirketler, this::musteriDegeriLabel));
             duzenleBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-            Button silBtn = new Button("Sil", e -> sirketSilOnay(c));
+            Button silBtn = new Button("Sil", e -> OnayDialog.open("Şirketi Sil",
+                "\"" + c.getName() + "\" şirketini kalıcı olarak silmek istediğinize emin misiniz? "
+                    + "Bu işlem geri alınamaz.",
+                "Şirket silindi.", this::showSirketler,
+                () -> companyService.deleteCompany(c.getCompanyId())));
             silBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
             islemler.add(duzenleBtn, silBtn);
             return islemler;
@@ -413,128 +314,6 @@ public class AdminView extends HorizontalLayout {
         sirketGrid.setItems(sirketler);
 
         mainContent.add(ustBar, arama, sirketGrid);
-    }
-
-    private void yeniSirketDialogAc() {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Yeni Şirket Ekle");
-        dialog.setWidth("420px");
-
-        TextField adField = new TextField("Şirket Adı");
-        adField.setWidthFull();
-
-        ComboBox<MusteriDegeri> degerBox = new ComboBox<>("Şirket Değeri");
-        degerBox.setItems(MusteriDegeri.values());
-        degerBox.setItemLabelGenerator(this::musteriDegeriLabel);
-        degerBox.setWidthFull();
-
-        Button kaydetBtn = new Button("Kaydet", e -> {
-            try {
-                companyService.createCompany(adField.getValue(), degerBox.getValue());
-                Notification.show("Şirket oluşturuldu.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showSirketler();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        kaydetBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(new VerticalLayout(adField, degerBox));
-        dialog.getFooter().add(iptalBtn, kaydetBtn);
-        dialog.open();
-    }
-
-    private void sirketDuzenleDialogAc(Company company) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Şirket Düzenle — " + company.getName());
-        dialog.setWidth("420px");
-
-        TextField adField = new TextField("Şirket Adı");
-        adField.setValue(company.getName());
-        adField.setWidthFull();
-
-        ComboBox<MusteriDegeri> degerBox = new ComboBox<>("Şirket Değeri");
-        degerBox.setItems(MusteriDegeri.values());
-        degerBox.setItemLabelGenerator(this::musteriDegeriLabel);
-        degerBox.setWidthFull();
-        if (company.getMusteriDegeri() != null) {
-            degerBox.setValue(company.getMusteriDegeri());
-        }
-
-        Button kaydetBtn = new Button("Kaydet", e -> {
-            try {
-                companyService.updateCompany(company.getCompanyId(), adField.getValue(), degerBox.getValue());
-                Notification.show("Şirket güncellendi.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showSirketler();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-            }
-        });
-        kaydetBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(new VerticalLayout(adField, degerBox));
-        dialog.getFooter().add(iptalBtn, kaydetBtn);
-        dialog.open();
-    }
-
-    private void kullaniciSilOnay(User user) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Kullanıcıyı Sil");
-
-        Paragraph mesaj = new Paragraph(
-            "\"" + user.getNameSurname() + "\" kullanıcısını kalıcı olarak silmek istediğinize emin misiniz? "
-            + "Bu işlem geri alınamaz.");
-
-        Button silBtn = new Button("Sil", e -> {
-            try {
-                userService.deleteUser(user.getUserId());
-                Notification.show("Kullanıcı silindi.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showKullanicilar();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 5000, Notification.Position.MIDDLE);
-            }
-        });
-        silBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_PRIMARY);
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(mesaj);
-        dialog.getFooter().add(iptalBtn, silBtn);
-        dialog.open();
-    }
-
-    private void sirketSilOnay(Company company) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Şirketi Sil");
-
-        Paragraph mesaj = new Paragraph(
-            "\"" + company.getName() + "\" şirketini kalıcı olarak silmek istediğinize emin misiniz? "
-            + "Bu işlem geri alınamaz.");
-
-        Button silBtn = new Button("Sil", e -> {
-            try {
-                companyService.deleteCompany(company.getCompanyId());
-                Notification.show("Şirket silindi.", 3000, Notification.Position.TOP_CENTER);
-                dialog.close();
-                showSirketler();
-            } catch (Exception ex) {
-                Notification.show(ex.getMessage(), 5000, Notification.Position.MIDDLE);
-            }
-        });
-        silBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_PRIMARY);
-
-        Button iptalBtn = new Button("İptal", e -> dialog.close());
-
-        dialog.add(mesaj);
-        dialog.getFooter().add(iptalBtn, silBtn);
-        dialog.open();
     }
 
     private String rolLabel(Role role) {

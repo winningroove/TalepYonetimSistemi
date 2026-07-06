@@ -1,9 +1,8 @@
 package com.example.views;
 
+import com.example.dialog.MusteriDetayDialog;
 import com.example.enums.RequestStatus;
-import com.example.enums.Role;
 import com.example.enums.WorkflowStatus;
-import com.example.message.RequestMessage;
 import com.example.message.RequestMessageService;
 import com.example.request.Request;
 import com.example.request.RequestFile;
@@ -114,7 +113,9 @@ public CustomerView(RequestService requestService,
         HorizontalLayout bildirimSatir = new HorizontalLayout(
             new Span("Bildirimler"),
             new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
-                reqId -> requestService.findById(reqId).ifPresent(this::detayDialogAc)));
+                reqId -> requestService.findById(reqId).ifPresent(r -> MusteriDetayDialog.open(
+                    r, currentUserId, durumMetni(r), requestFileService, requestMessageService,
+                    userService, activityLogService))));
         bildirimSatir.setAlignItems(Alignment.CENTER);
         bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
 
@@ -136,10 +137,10 @@ public CustomerView(RequestService requestService,
             .set("padding-top", "16px")
             .set("width", "100%");
 
-        HorizontalLayout profilSatiri = com.example.user.ProfileDialog.sidebarProfileRow(
+        HorizontalLayout profilSatiri = com.example.dialog.ProfileDialog.sidebarProfileRow(
             currentUserName, "Müşteri",
             () -> userService.findById(currentUserId).ifPresent(u ->
-                com.example.user.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
+                com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
         sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
@@ -268,7 +269,9 @@ public CustomerView(RequestService requestService,
         grid.addColumn(r -> DateUtil.format(r.getCreatedAt())).setHeader("Tarih");
         grid.addComponentColumn(this::durumBadgeFor).setHeader("Durum");
         grid.addComponentColumn(r -> {
-            Button detayBtn = new Button("Detay", e -> detayDialogAc(r));
+            Button detayBtn = new Button("Detay", e -> MusteriDetayDialog.open(
+                r, currentUserId, durumMetni(r), requestFileService, requestMessageService,
+                userService, activityLogService));
             return detayBtn;
         }).setHeader("İşlem");
         grid.setWidthFull();
@@ -284,157 +287,6 @@ public CustomerView(RequestService requestService,
 
         mainContent.add(baslik, arama, grid);
     }
-
-    private void detayDialogAc(Request request) {
-    Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Talep Detayı");
-
-    VerticalLayout icerik = new VerticalLayout();
-    icerik.add(new Span("Başlık: " + request.getTitle()));
-    icerik.add(new Span("Açıklama: " + request.getDescription()));
-    icerik.add(new Span("Durum: " + durumMetni(request)));
-    icerik.add(new Span("Tarih: " + DateUtil.format(request.getCreatedAt())));
-
-    if (request.getStatus() == RequestStatus.REJECTED
-            && request.getRejectionReason() != null) {
-        Span ret = new Span("Ret Gerekçesi: " + request.getRejectionReason());
-        ret.getStyle().set("color", "red");
-        icerik.add(ret);
-    }
-
-    // Dosyalar
-    List<RequestFile> dosyalar = requestFileService.getFilesByRequestId(request.getRequestId());
-    if (!dosyalar.isEmpty()) {
-        H4 dosyaBaslik = new H4("Ekli Dosyalar");
-        icerik.add(dosyaBaslik);
-
-        for (RequestFile dosya : dosyalar) {
-            Anchor link = new Anchor(
-                getDownloadUrl(dosya),
-                dosya.getFileName() + " (" + formatFileSize(dosya.getFileSize()) + ")"
-            );
-            link.getElement().setAttribute("download", dosya.getFileName());
-            icerik.add(link);
-        }
-    }
-
-    icerik.add(mesajBolumu(request.getRequestId()));
-    icerik.add(new com.example.activity.ActivityTimeline(
-        activityLogService.getByRequestId(request.getRequestId()),
-        id -> userService.findById(id).map(User::getNameSurname).orElse("Sistem")));
-
-    dialog.setWidth("520px");
-    dialog.add(icerik);
-    dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
-    dialog.open();
-}
-
-private String getDownloadUrl(RequestFile dosya) {
-    return "data:application/octet-stream;base64," +
-        java.util.Base64.getEncoder().encodeToString(dosya.getFileData());
-}
-
-private String formatFileSize(Long bytes) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
-    return (bytes / (1024 * 1024)) + " MB";
-}
-
-private VerticalLayout mesajBolumu(Long requestId) {
-    VerticalLayout panel = new VerticalLayout();
-    panel.setPadding(false);
-    panel.setSpacing(false);
-    panel.setWidthFull();
-
-    H4 baslik = new H4("Mesajlar");
-    baslik.getStyle().set("margin", "12px 0 6px 0");
-
-    VerticalLayout liste = new VerticalLayout();
-    liste.setPadding(false);
-    liste.setSpacing(false);
-    liste.setWidthFull();
-    liste.getStyle()
-        .set("max-height", "240px").set("overflow-y", "auto")
-        .set("background", "#f8f9fa").set("border-radius", "6px").set("padding", "8px");
-
-    Runnable yukle = () -> {
-        liste.removeAll();
-        List<RequestMessage> mesajlar = requestMessageService.getMessages(requestId);
-        if (mesajlar.isEmpty()) {
-            Span yok = new Span("Henüz mesaj yok.");
-            yok.getStyle().set("color", "#888").set("font-size", "12px");
-            liste.add(yok);
-        } else {
-            mesajlar.forEach(m -> liste.add(mesajBalonu(m)));
-        }
-    };
-    yukle.run();
-
-    TextArea girdi = new TextArea();
-    girdi.setPlaceholder("Mesaj yazın...");
-    girdi.setWidthFull();
-    girdi.setMaxHeight("100px");
-
-    Button gonder = new Button("Gönder", e -> {
-        try {
-            requestMessageService.sendMessage(requestId, currentUserId, girdi.getValue());
-            girdi.clear();
-            yukle.run();
-        } catch (Exception ex) {
-            Notification.show(ex.getMessage(), 3000, Notification.Position.MIDDLE);
-        }
-    });
-    gonder.getStyle().set("background-color", "#1B2A3B").set("color", "white");
-
-    HorizontalLayout gonderSatir = new HorizontalLayout(girdi, gonder);
-    gonderSatir.setWidthFull();
-    gonderSatir.setAlignItems(Alignment.END);
-    gonderSatir.expand(girdi);
-
-    panel.add(baslik, liste, gonderSatir);
-    return panel;
-}
-
-private Div mesajBalonu(RequestMessage m) {
-    User sender = userService.findById(m.getSenderId()).orElse(null);
-    String ad = sender != null ? sender.getNameSurname() : "Bilinmeyen";
-    String rol = sender != null ? rolKisa(sender.getRole()) : "";
-    boolean benim = currentUserId != null && currentUserId.equals(m.getSenderId());
-
-    Div balon = new Div();
-    balon.getStyle()
-        .set("background", benim ? "#d1e7ff" : "#ffffff")
-        .set("border", "1px solid #e0e0e0").set("border-radius", "6px")
-        .set("padding", "6px 10px").set("max-width", "75%");
-
-    Span ust = new Span(ad + " · " + rol + " · " + DateUtil.format(m.getCreatedAt()));
-    ust.getStyle()
-        .set("font-size", "11px").set("color", "#666")
-        .set("font-weight", "bold").set("display", "block").set("margin-bottom", "2px");
-
-    Span govde = new Span(m.getBody());
-    govde.getStyle().set("white-space", "pre-wrap").set("font-size", "13px");
-
-    balon.add(ust, govde);
-
-    Div satir = new Div(balon);
-    satir.getStyle()
-        .set("display", "flex")
-        .set("justify-content", benim ? "flex-end" : "flex-start")
-        .set("width", "100%")
-        .set("margin-bottom", "6px");
-    return satir;
-}
-
-private String rolKisa(Role role) {
-    return switch (role) {
-        case CUSTOMER      -> "Müşteri";
-        case PRODUCT_OWNER -> "Ürün Sorumlusu";
-        case DEVELOPER     -> "Geliştirici";
-        case SCRUM_MASTER  -> "Scrum Master";
-        case ADMIN         -> "Admin";
-    };
-}
 
     private String durumLabel(RequestStatus status) {
         return switch (status) {
