@@ -170,24 +170,26 @@ public final class OnceliklendirmeDialog {
                 skorSpan.setText("Tahmini Skor: " + skor);
                 labelSpan.setText(" — " + prioritizationService.getLabel(skor));
 
-                // Ağırlıklar (30/25/20/15/10) ÷ 5 baz skoru verir. Her satır o faktörün
-                // baz skora net katkısını gösterir; altta eklemeli düzelticiler yer alır.
-                int isEtkisiKatki = isEtkisiBox.getValue() * 30 / 5;
-                int aciliyetKatki = acilyetBox.getValue() * 25 / 5;
-                int sirketKatki   = musteriDegeriPuan * 20 / 5;
-                int isTipiKatki   = isTipiBox.getValue().getPuan() * 15 / 5;
-                int beklemeKatki  = beklemePuan * 10 / 5;
-                int bazSkor = isEtkisiKatki + aciliyetKatki + sirketKatki + isTipiKatki + beklemeKatki;
+                // Ağırlıklar ÷ bölen baz skoru verir. Katsayılar koda gömülü değildir;
+                // PrioritizationProperties'ten (application.properties ile ayarlanabilir) okunur.
+                var a = prioritizationService.getProperties().getAgirlik();
+                String bolenStr = fmt(a.getBolen());
+                double isEtkisiKatki = isEtkisiBox.getValue() * a.getIsEtkisi() / a.getBolen();
+                double aciliyetKatki = acilyetBox.getValue() * a.getAciliyet() / a.getBolen();
+                double sirketKatki   = musteriDegeriPuan * a.getMusteriDegeri() / a.getBolen();
+                double isTipiKatki   = isTipiBox.getValue().getPuan() * a.getIsTipi() / a.getBolen();
+                double beklemeKatki  = beklemePuan * a.getBeklemeSuresi() / a.getBolen();
+                double bazSkor = isEtkisiKatki + aciliyetKatki + sirketKatki + isTipiKatki + beklemeKatki;
 
                 dagilimIcerik.removeAll();
                 dagilimIcerik.add(
-                    dagilimSatiri("İş Etkisi",       isEtkisiBox.getValue() + " × 30 ÷ 5", "+" + isEtkisiKatki, false),
-                    dagilimSatiri("Aciliyet",        acilyetBox.getValue() + " × 25 ÷ 5",  "+" + aciliyetKatki, false),
-                    dagilimSatiri("Şirket Değeri",   musteriDegeriPuan + " × 20 ÷ 5",      "+" + sirketKatki,   false),
-                    dagilimSatiri("İş Tipi",         isTipiBox.getValue().getPuan() + " × 15 ÷ 5", "+" + isTipiKatki, false),
-                    dagilimSatiri("Bekleme Süresi",  beklemePuan + " × 10 ÷ 5",            "+" + beklemeKatki,  false),
+                    dagilimSatiri("İş Etkisi",       isEtkisiBox.getValue() + " × " + a.getIsEtkisi() + " ÷ " + bolenStr, "+" + fmt(isEtkisiKatki), false),
+                    dagilimSatiri("Aciliyet",        acilyetBox.getValue() + " × " + a.getAciliyet() + " ÷ " + bolenStr,  "+" + fmt(aciliyetKatki), false),
+                    dagilimSatiri("Şirket Değeri",   musteriDegeriPuan + " × " + a.getMusteriDegeri() + " ÷ " + bolenStr, "+" + fmt(sirketKatki),   false),
+                    dagilimSatiri("İş Tipi",         isTipiBox.getValue().getPuan() + " × " + a.getIsTipi() + " ÷ " + bolenStr, "+" + fmt(isTipiKatki), false),
+                    dagilimSatiri("Bekleme Süresi",  beklemePuan + " × " + a.getBeklemeSuresi() + " ÷ " + bolenStr,        "+" + fmt(beklemeKatki),  false),
                     dagilimAyrac(),
-                    dagilimSatiri("Baz Skor",        "", String.valueOf(bazSkor), true),
+                    dagilimSatiri("Baz Skor",        "", fmt(bazSkor), true),
                     dagilimSatiri("Yönetici Takdiri", takdir != null ? takdirKisa(takdir) : "", isaretli(takdirPuan), false),
                     dagilimSatiri("Güvenilirlik",    "", isaretli(credibility), false),
                     dagilimSatiri("Geliştirici Müdahalesi", "SM girecek", "0", false),
@@ -287,6 +289,14 @@ public final class OnceliklendirmeDialog {
         Div d = new Div();
         d.getStyle().set("border-top", "1px solid rgba(3,107,170,0.20)").set("margin", "5px 0");
         return d;
+    }
+
+    /** Ondalık değeri temiz gösterir: tam sayıysa ondalık kısmı gizler (24.0 → "24"). */
+    private static String fmt(double v) {
+        if (v == Math.rint(v) && !Double.isInfinite(v)) {
+            return String.valueOf((long) v);
+        }
+        return String.valueOf(Math.round(v * 10) / 10.0);
     }
 
     /** Eklemeli düzeltici puanı işaretli metne çevirir (+5 / 0 / -10). */

@@ -22,40 +22,49 @@ public class PrioritizationService {
     private final PrioritizationRepository prioritizationRepository;
     private final RequestService requestService;
     private final UserService userService;
+    private final PrioritizationProperties props;
 
     private final Map<Long, Optional<Prioritization>> byRequestCache = new ConcurrentHashMap<>();
 
+    /** Skor katsayıları ve eşikleri (dialoglardaki dağılım gösterimi de bunu kullanır). */
+    public PrioritizationProperties getProperties() {
+        return props;
+    }
+
     private double calculateBazSkor(Prioritization p) {
+        PrioritizationProperties.Agirlik a = props.getAgirlik();
         return (
-            p.getIsEtkisi()          * 30 +
-            p.getAciliyet()          * 25 +
-            p.getMusteriDegeriPuan() * 20 +
-            p.getIsTipiPuan()        * 15 +
-            p.getBeklemeSuresiPuan() * 10
-        ) / 5.0;
+            p.getIsEtkisi()          * a.getIsEtkisi() +
+            p.getAciliyet()          * a.getAciliyet() +
+            p.getMusteriDegeriPuan() * a.getMusteriDegeri() +
+            p.getIsTipiPuan()        * a.getIsTipi() +
+            p.getBeklemeSuresiPuan() * a.getBeklemeSuresi()
+        ) / a.getBolen();
     }
 
     public int calculateBeklemeSuresiPuan(LocalDateTime createdAt) {
-        long gun = Math.min(30, ChronoUnit.DAYS.between(createdAt, LocalDateTime.now()));
-        if (gun >= 30) return 15;
-        if (gun >= 14) return 10;
-        if (gun >= 7)  return 8;
-        if (gun >= 3)  return 5;
-        return 1;
+        PrioritizationProperties.Bekleme b = props.getBekleme();
+        long gun = Math.min(b.getMaxGun(), ChronoUnit.DAYS.between(createdAt, LocalDateTime.now()));
+        if (gun >= b.getCokUzunGun()) return b.getCokUzunPuan();
+        if (gun >= b.getUzunGun())    return b.getUzunPuan();
+        if (gun >= b.getOrtaGun())    return b.getOrtaPuan();
+        if (gun >= b.getKisaGun())    return b.getKisaPuan();
+        return b.getVarsayilanPuan();
     }
 
     public int calculateCredibilityScore(Long customerId) {
+        PrioritizationProperties.Guvenilirlik g = props.getGuvenilirlik();
         CredibilityStats s = requestService.getCredibilityStats(customerId);
 
-        if (s.total() < 5) {
+        if (s.total() < g.getMinTalep()) {
             return 0;
         }
 
         double reddedilmeOrani = (double) s.rejected() / s.total();
         double onaylanmaOrani  = (double) s.approved() / s.total();
 
-        if (reddedilmeOrani > 0.70) return -10;
-        if (onaylanmaOrani  >= 0.80) return 5;
+        if (reddedilmeOrani > g.getRedOraniEsik())  return g.getCeza();
+        if (onaylanmaOrani  >= g.getOnayOraniEsik()) return g.getOdul();
         return 0;
     }
 
@@ -72,11 +81,12 @@ public class PrioritizationService {
 
     
     public String getLabel(int score) {
-        if (score == 0)  return "İPTAL";
-        if (score <= 36) return "ÇOK DÜŞÜK";
-        if (score <= 52) return "DÜŞÜK";
-        if (score <= 68) return "ORTA";
-        if (score <= 84) return "YÜKSEK";
+        PrioritizationProperties.Etiket e = props.getEtiket();
+        if (score == 0)              return "İPTAL";
+        if (score <= e.getCokDusuk()) return "ÇOK DÜŞÜK";
+        if (score <= e.getDusuk())    return "DÜŞÜK";
+        if (score <= e.getOrta())     return "ORTA";
+        if (score <= e.getYuksek())   return "YÜKSEK";
         return "KRİTİK";
     }
 
