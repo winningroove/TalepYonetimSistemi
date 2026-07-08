@@ -22,6 +22,47 @@ public class PrioritizationProperties {
     private Guvenilirlik guvenilirlik = new Guvenilirlik();
     private Bekleme bekleme = new Bekleme();
 
+    /**
+     * Derin kopya üretir. Config servisi, varsayılanları (bu bean) bozmadan
+     * üstüne DB'deki override değerlerini uygulamak için kullanır.
+     */
+    public PrioritizationProperties copy() {
+        PrioritizationProperties c = new PrioritizationProperties();
+        Agirlik a = new Agirlik();
+        a.setIsEtkisi(agirlik.getIsEtkisi());
+        a.setAciliyet(agirlik.getAciliyet());
+        a.setMusteriDegeri(agirlik.getMusteriDegeri());
+        a.setIsTipi(agirlik.getIsTipi());
+        a.setBeklemeSuresi(agirlik.getBeklemeSuresi());
+        a.setBolen(agirlik.getBolen());
+        c.setAgirlik(a);
+
+        Etiket e = new Etiket();
+        e.setCokDusuk(etiket.getCokDusuk());
+        e.setDusuk(etiket.getDusuk());
+        e.setOrta(etiket.getOrta());
+        e.setYuksek(etiket.getYuksek());
+        c.setEtiket(e);
+
+        Guvenilirlik g = new Guvenilirlik();
+        g.setMinTalep(guvenilirlik.getMinTalep());
+        g.setRedOraniEsik(guvenilirlik.getRedOraniEsik());
+        g.setOnayOraniEsik(guvenilirlik.getOnayOraniEsik());
+        g.setCeza(guvenilirlik.getCeza());
+        g.setOdul(guvenilirlik.getOdul());
+        c.setGuvenilirlik(g);
+
+        Bekleme b = new Bekleme();
+        b.setMaxGun(bekleme.getMaxGun());
+        b.setCokUzunGun(bekleme.getCokUzunGun());   b.setCokUzunPuan(bekleme.getCokUzunPuan());
+        b.setUzunGun(bekleme.getUzunGun());         b.setUzunPuan(bekleme.getUzunPuan());
+        b.setOrtaGun(bekleme.getOrtaGun());         b.setOrtaPuan(bekleme.getOrtaPuan());
+        b.setKisaGun(bekleme.getKisaGun());         b.setKisaPuan(bekleme.getKisaPuan());
+        b.setVarsayilanPuan(bekleme.getVarsayilanPuan());
+        c.setBekleme(b);
+        return c;
+    }
+
     /** Baz skor faktör ağırlıkları. Ağırlıklı toplam {@code bolen}'e bölünür. */
     @Data
     public static class Agirlik {

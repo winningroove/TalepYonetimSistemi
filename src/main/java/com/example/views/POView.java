@@ -15,6 +15,7 @@ import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
+import com.example.util.Brand;
 import com.example.util.GridSearch;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
@@ -153,7 +154,7 @@ public class POView extends HorizontalLayout {
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
-        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik,
+        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik,
             gostergeBtn, gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
         guncelleGelenTalepButonu();
         sidebar.addAndExpand(new Div());

@@ -22,17 +22,17 @@ public class PrioritizationService {
     private final PrioritizationRepository prioritizationRepository;
     private final RequestService requestService;
     private final UserService userService;
-    private final PrioritizationProperties props;
+    private final PrioritizationConfigService configService;
 
     private final Map<Long, Optional<Prioritization>> byRequestCache = new ConcurrentHashMap<>();
 
-    /** Skor katsayıları ve eşikleri (dialoglardaki dağılım gösterimi de bunu kullanır). */
+    /** Skor katsayıları ve eşikleri (etkin, DB override'ları uygulanmış). Dialoglardaki dağılım gösterimi de bunu kullanır. */
     public PrioritizationProperties getProperties() {
-        return props;
+        return configService.current();
     }
 
     private double calculateBazSkor(Prioritization p) {
-        PrioritizationProperties.Agirlik a = props.getAgirlik();
+        PrioritizationProperties.Agirlik a = configService.current().getAgirlik();
         return (
             p.getIsEtkisi()          * a.getIsEtkisi() +
             p.getAciliyet()          * a.getAciliyet() +
@@ -43,7 +43,7 @@ public class PrioritizationService {
     }
 
     public int calculateBeklemeSuresiPuan(LocalDateTime createdAt) {
-        PrioritizationProperties.Bekleme b = props.getBekleme();
+        PrioritizationProperties.Bekleme b = configService.current().getBekleme();
         long gun = Math.min(b.getMaxGun(), ChronoUnit.DAYS.between(createdAt, LocalDateTime.now()));
         if (gun >= b.getCokUzunGun()) return b.getCokUzunPuan();
         if (gun >= b.getUzunGun())    return b.getUzunPuan();
@@ -53,7 +53,7 @@ public class PrioritizationService {
     }
 
     public int calculateCredibilityScore(Long customerId) {
-        PrioritizationProperties.Guvenilirlik g = props.getGuvenilirlik();
+        PrioritizationProperties.Guvenilirlik g = configService.current().getGuvenilirlik();
         CredibilityStats s = requestService.getCredibilityStats(customerId);
 
         if (s.total() < g.getMinTalep()) {
@@ -81,7 +81,7 @@ public class PrioritizationService {
 
     
     public String getLabel(int score) {
-        PrioritizationProperties.Etiket e = props.getEtiket();
+        PrioritizationProperties.Etiket e = configService.current().getEtiket();
         if (score == 0)              return "İPTAL";
         if (score <= e.getCokDusuk()) return "ÇOK DÜŞÜK";
         if (score <= e.getDusuk())    return "DÜŞÜK";

@@ -66,6 +66,9 @@ public class SecurityConfig {
         // CSRF, projenin mevcut yapısına uygun olarak kapalı tutulur; böylece
         // GET ile /logout ve LoginForm gönderimi çalışmaya devam eder.
         http.csrf(csrf -> csrf.disable())
+            // Statik görseller (logo vb.) giriş yapılmadan da erişilebilir olmalı.
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/images/**").permitAll())
             .with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer
                 .loginView(LoginView.class)
                 .enableCsrfConfiguration(false));

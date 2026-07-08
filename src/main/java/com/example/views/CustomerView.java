@@ -11,6 +11,7 @@ import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
+import com.example.util.Brand;
 import com.example.util.GridSearch;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
@@ -142,7 +143,7 @@ public CustomerView(RequestService requestService,
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
-        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
+        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
         sidebar.add(divider, profilSatiri, buildLogoutButton());
 

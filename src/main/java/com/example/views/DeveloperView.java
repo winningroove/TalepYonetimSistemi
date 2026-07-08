@@ -10,6 +10,7 @@ import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
+import com.example.util.Brand;
 import com.example.util.GridSearch;
 import com.example.workflow.Workflow;
 import com.example.workflow.WorkflowService;
@@ -140,7 +141,7 @@ public class DeveloperView extends HorizontalLayout {
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
-        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, gorevlerimBtn, tamamlananBtn);
+        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, gorevlerimBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, profilSatiri, buildLogoutButton());
 

@@ -10,19 +10,15 @@ import com.example.enums.Role;
 import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
+import com.example.util.Brand;
 import com.example.util.GridSearch;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.EmailField;
-import com.vaadin.flow.component.textfield.PasswordField;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
@@ -40,6 +36,7 @@ public class AdminView extends HorizontalLayout {
     private final com.example.notification.NotificationService notificationService;
     private final com.example.notification.NotificationBroadcaster notificationBroadcaster;
     private final com.example.activity.ActivityLogService activityLogService;
+    private final com.example.prioritization.PrioritizationConfigService prioritizationConfigService;
     private String currentUserName;
     private Long currentUserId;
 
@@ -49,12 +46,14 @@ public class AdminView extends HorizontalLayout {
     public AdminView(UserService userService, CompanyService companyService,
                       com.example.notification.NotificationService notificationService,
                       com.example.notification.NotificationBroadcaster notificationBroadcaster,
-                      com.example.activity.ActivityLogService activityLogService) {
+                      com.example.activity.ActivityLogService activityLogService,
+                      com.example.prioritization.PrioritizationConfigService prioritizationConfigService) {
         this.userService = userService;
         this.companyService = companyService;
         this.notificationService = notificationService;
         this.notificationBroadcaster = notificationBroadcaster;
         this.activityLogService = activityLogService;
+        this.prioritizationConfigService = prioritizationConfigService;
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         userService.findByEmail(email).ifPresent(u -> {
@@ -111,6 +110,9 @@ public class AdminView extends HorizontalLayout {
         Button sirketlerBtn = menuButton("Şirket Yönetimi");
         sirketlerBtn.addClickListener(e -> showSirketler());
 
+        Button skorAyarBtn = menuButton("Skor Ayarları");
+        skorAyarBtn.addClickListener(e -> showSkorAyarlari());
+
         Div divider = new Div();
         divider.getStyle()
             .set("border-top", "1px solid #444")
@@ -123,7 +125,7 @@ public class AdminView extends HorizontalLayout {
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, null, userService)));
 
-        sidebar.add(baslik, altBaslik, bildirimSatir, menuBaslik, kullanicilarBtn, sirketlerBtn);
+        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, kullanicilarBtn, sirketlerBtn, skorAyarBtn);
         sidebar.addAndExpand(new Div());
         sidebar.add(divider, profilSatiri, buildLogoutButton());
 
@@ -314,6 +316,11 @@ public class AdminView extends HorizontalLayout {
         sirketGrid.setItems(sirketler);
 
         mainContent.add(ustBar, arama, sirketGrid);
+    }
+
+    private void showSkorAyarlari() {
+        mainContent.removeAll();
+        mainContent.add(new com.example.prioritization.SkorAyarlariForm(prioritizationConfigService));
     }
 
     private String rolLabel(Role role) {

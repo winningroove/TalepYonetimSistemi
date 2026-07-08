@@ -2,6 +2,7 @@ package com.example.views;
 
 import com.example.dialog.SifremiUnuttumDialog;
 import com.example.notification.NotificationService;
+import com.example.util.Brand;
 import com.example.user.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -109,7 +110,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
             .set("font-size", "11px")
             .set("margin-top", "32px");
 
-        add(marka, altYazi, kart, dipNot);
+        add(Brand.loginLogo(), marka, altYazi, kart, dipNot);
     }
 
     @Override
