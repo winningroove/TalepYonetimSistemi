@@ -11,7 +11,7 @@ import com.vaadin.flow.component.page.Push;
 // Aura teması: özel CSS ve inline stiller bu tabana göre ayarlandı.
 @SpringBootApplication
 @StyleSheet(Aura.STYLESHEET)
-@StyleSheet("styles.css?v=5") // Özel stiller (v ile önbellek kırma)
+@StyleSheet("styles.css?v=7") // Özel stiller (v ile önbellek kırma)
 @Push
 public class Application implements AppShellConfigurator {
 

@@ -145,7 +145,7 @@ public CustomerView(RequestService requestService,
 
         sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, yeniTalepBtn, taleplerimBtn);
         sidebar.addAndExpand(new Div()); // boşluğu aşağı it
-        sidebar.add(divider, profilSatiri, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
 
         return sidebar;
     }

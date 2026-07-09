@@ -16,6 +16,7 @@ import com.example.user.User;
 import com.example.user.UserService;
 import com.example.util.DateUtil;
 import com.example.util.Brand;
+import com.example.util.Charts;
 import com.example.util.GridSearch;
 import com.example.workflow.WorkflowService;
 import com.vaadin.flow.component.button.Button;
@@ -158,7 +159,7 @@ public class POView extends HorizontalLayout {
             gostergeBtn, gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
         guncelleGelenTalepButonu();
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, profilSatiri, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
 
         return sidebar;
     }
@@ -232,16 +233,43 @@ public class POView extends HorizontalLayout {
         kartlar.setWidthFull();
         kartlar.getStyle().set("flex-wrap", "wrap").set("gap", "16px");
 
-        // Talep durum dağılımı (çubuk)
+        // Talep durum dağılımı (donut) — talep statüleri birbirini dışlayan bir bütün
+        int reddedilen = requestService.getByStatus(RequestStatus.REJECTED).size();
+        int birlestirilen = requestService.getByStatus(RequestStatus.DUPLICATE).size();
+        java.util.LinkedHashMap<String, Integer> durumVeri = new java.util.LinkedHashMap<>();
+        durumVeri.put("Yeni", yeni);
+        durumVeri.put("İncelemede", incelemede);
+        durumVeri.put("Önceliklendirilmiş", oncelikli);
+        durumVeri.put("Reddedilen", reddedilen);
+        durumVeri.put("Birleştirilen", birlestirilen);
+        java.util.LinkedHashMap<String, String> durumRenk = new java.util.LinkedHashMap<>();
+        durumRenk.put("Yeni", "#9aa0a6");
+        durumRenk.put("İncelemede", "#c99a06");
+        durumRenk.put("Önceliklendirilmiş", "#036baa");
+        durumRenk.put("Reddedilen", "#b23b3b");
+        durumRenk.put("Birleştirilen", "#7a5db0");
         Div durumKutu = kutu("Talep Durum Dağılımı");
-        int max = Math.max(1, Math.max(Math.max(yeni, incelemede),
-            Math.max(oncelikli, (int) tamamlanan)));
-        durumKutu.add(
-            cubukSatiri("Yeni", yeni, max, "#9aa0a6"),
-            cubukSatiri("İncelemede", incelemede, max, "#c99a06"),
-            cubukSatiri("Önceliklendirilmiş", oncelikli, max, "#036baa"),
-            cubukSatiri("Tamamlanan", (int) tamamlanan, max, "#155724")
-        );
+        durumKutu.add(Charts.donut(durumVeri, durumRenk));
+
+        // Haftalık gelen talep trendi (son 7 gün)
+        List<Request> hepsi = new ArrayList<>();
+        for (RequestStatus s : RequestStatus.values()) {
+            hepsi.addAll(requestService.getByStatus(s));
+        }
+        java.time.LocalDate bugun = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter gf = java.time.format.DateTimeFormatter.ofPattern("dd.MM");
+        List<String> gunEtiket = new ArrayList<>();
+        List<Integer> gunDeger = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            java.time.LocalDate g = bugun.minusDays(i);
+            long c = hepsi.stream()
+                .filter(r -> r.getCreatedAt() != null && r.getCreatedAt().toLocalDate().equals(g))
+                .count();
+            gunEtiket.add(g.format(gf));
+            gunDeger.add((int) c);
+        }
+        Div trendKutu = kutu("Haftalık Gelen Talep (son 7 gün)");
+        trendKutu.add(Charts.dikeyCubuklar(gunEtiket, gunDeger, "#036baa"));
 
         // En yüksek öncelikli 5 talep
         Div oncelikKutu = kutu("En Yüksek Öncelikli Talepler");
@@ -268,11 +296,15 @@ public class POView extends HorizontalLayout {
             }
         }
 
-        HorizontalLayout altSatir = new HorizontalLayout(durumKutu, oncelikKutu);
+        HorizontalLayout grafikSatir = new HorizontalLayout(durumKutu, trendKutu);
+        grafikSatir.setWidthFull();
+        grafikSatir.getStyle().set("flex-wrap", "wrap").set("gap", "16px").set("margin-top", "16px");
+
+        HorizontalLayout altSatir = new HorizontalLayout(oncelikKutu);
         altSatir.setWidthFull();
         altSatir.getStyle().set("flex-wrap", "wrap").set("gap", "16px").set("margin-top", "16px");
 
-        mainContent.add(baslik, aciklama, kartlar, altSatir, bildirimlerBolumu());
+        mainContent.add(baslik, aciklama, kartlar, grafikSatir, altSatir, bildirimlerBolumu());
     }
 
     /** Gösterge panelinin altında son bildirimler; talebi olanlara tıklanınca ilgili talep vurgulanır. */
@@ -362,26 +394,6 @@ public class POView extends HorizontalLayout {
         h.getStyle().set("margin", "0 0 12px 0");
         box.add(h);
         return box;
-    }
-
-    private Div cubukSatiri(String etiket, int deger, int max, String renk) {
-        Div satir = new Div();
-        satir.getStyle().set("margin-bottom", "10px");
-        Span lbl = new Span(etiket + "  (" + deger + ")");
-        lbl.getStyle().set("font-size", "13px").set("display", "block").set("margin-bottom", "4px");
-        Div track = new Div();
-        track.getStyle()
-            .set("background", "#eee").set("border-radius", "6px")
-            .set("width", "100%").set("height", "18px").set("overflow", "hidden");
-        Div fill = new Div();
-        int yuzde = max > 0 ? (int) Math.round(deger * 100.0 / max) : 0;
-        fill.getStyle()
-            .set("background", renk).set("height", "100%")
-            .set("width", yuzde + "%").set("border-radius", "6px")
-            .set("min-width", deger > 0 ? "3px" : "0");
-        track.add(fill);
-        satir.add(lbl, track);
-        return satir;
     }
 
     /** Menüdeki "Gelen Talepler (N)" sayacını günceller. */

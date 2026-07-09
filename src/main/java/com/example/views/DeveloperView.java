@@ -143,7 +143,7 @@ public class DeveloperView extends HorizontalLayout {
 
         sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, gorevlerimBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, profilSatiri, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
 
         return sidebar;
     }

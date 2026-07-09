@@ -136,7 +136,7 @@ public ScrumMasterView(WorkflowService workflowService,
 
         sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
         sidebar.addAndExpand(new Div());
-        sidebar.add(divider, profilSatiri, buildLogoutButton());
+        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
 
         return sidebar;
     }

@@ -167,3 +167,78 @@ vaadin-combo-box-overlay::part(overlay) {
   transform: translateY(-3px);
   box-shadow: 0 12px 28px rgba(27, 42, 59, 0.16) !important;
 }
+
+/* =========================================================
+   KARANLIK MOD  (kökte data-theme="dark" iken)
+   Ana yüzeyleri koyulaştırır. Sidebar zaten koyu mavi olduğu
+   için dokunulmaz. Bazı iç panellerin inline arka planları
+   (ör. mesaj kutuları) açık kalabilir — gerekirse tek tek eklenir.
+   ========================================================= */
+html[data-theme="dark"] { color-scheme: dark; }
+
+/* Zemin + varsayılan metin (inline rengi olmayan her şey aydınlanır) */
+html[data-theme="dark"] body {
+  background: linear-gradient(135deg, #0f1620 0%, #131c27 100%) !important;
+  color: #e6edf5 !important;
+}
+
+/* Grid */
+html[data-theme="dark"] vaadin-grid {
+  border-color: rgba(255,255,255,0.10);
+  background: #131c27;
+  color: #dbe4ee;
+}
+html[data-theme="dark"] vaadin-grid::part(cell) { background: #131c27 !important; }
+html[data-theme="dark"] vaadin-grid::part(header-cell) { background: #1a2531 !important; color: #cdd9e5; }
+html[data-theme="dark"] vaadin-grid::part(row):hover { background: rgba(3,107,170,0.20) !important; }
+
+/* Form alanları */
+html[data-theme="dark"] vaadin-text-field,
+html[data-theme="dark"] vaadin-text-area,
+html[data-theme="dark"] vaadin-email-field,
+html[data-theme="dark"] vaadin-password-field,
+html[data-theme="dark"] vaadin-combo-box,
+html[data-theme="dark"] vaadin-number-field,
+html[data-theme="dark"] vaadin-integer-field { color: #e6edf5; }
+html[data-theme="dark"] vaadin-text-field::part(input-field),
+html[data-theme="dark"] vaadin-text-area::part(input-field),
+html[data-theme="dark"] vaadin-email-field::part(input-field),
+html[data-theme="dark"] vaadin-password-field::part(input-field),
+html[data-theme="dark"] vaadin-combo-box::part(input-field),
+html[data-theme="dark"] vaadin-number-field::part(input-field),
+html[data-theme="dark"] vaadin-integer-field::part(input-field) {
+  background: rgba(255,255,255,0.06) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+  color: #e6edf5;
+}
+html[data-theme="dark"] vaadin-text-field::part(label),
+html[data-theme="dark"] vaadin-email-field::part(label),
+html[data-theme="dark"] vaadin-password-field::part(label),
+html[data-theme="dark"] vaadin-combo-box::part(label),
+html[data-theme="dark"] vaadin-number-field::part(label),
+html[data-theme="dark"] vaadin-integer-field::part(label),
+html[data-theme="dark"] vaadin-text-area::part(label) { color: #aeb9c5; }
+
+/* Dialog + açılır yüzeyler */
+html[data-theme="dark"] vaadin-dialog-overlay::part(overlay),
+html[data-theme="dark"] vaadin-confirm-dialog-overlay::part(overlay) {
+  background: rgba(22,29,39,0.90) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #e6edf5;
+}
+html[data-theme="dark"] vaadin-combo-box-overlay::part(overlay),
+html[data-theme="dark"] vaadin-select-overlay::part(overlay),
+html[data-theme="dark"] vaadin-context-menu-overlay::part(overlay),
+html[data-theme="dark"] vaadin-menu-bar-overlay::part(overlay) {
+  background: rgba(22,29,39,0.96) !important;
+  border-color: rgba(255,255,255,0.12);
+  color: #e6edf5;
+}
+
+/* Bildirim kartı + gösterge paneli kartları */
+html[data-theme="dark"] vaadin-notification-card { background: #1a2531 !important; color: #e6edf5; }
+html[data-theme="dark"] .ui-card { background: #18212c !important; color: #e6edf5; }
+
+/* Donut grafik ortasındaki delik — kart arka planıyla eşleşir (her iki temada) */
+.donut-hole { background: #ffffff; }
+html[data-theme="dark"] .donut-hole { background: #18212c; }
