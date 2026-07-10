@@ -6,6 +6,7 @@ import com.example.prioritization.PrioritizationService;
 import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
+import com.example.util.AppSidebar;
 import com.example.util.DateUtil;
 import com.example.util.Brand;
 import com.example.util.GridSearch;
@@ -80,99 +81,19 @@ public ScrumMasterView(WorkflowService workflowService,
     }
 
     private VerticalLayout buildSidebar() {
-        VerticalLayout sidebar = new VerticalLayout();
-        sidebar.setWidth("260px");
-        sidebar.setHeightFull();
-        sidebar.setPadding(true);
-        sidebar.setSpacing(false);
-        sidebar.getStyle()
-            .set("background-image",
-                "linear-gradient(180deg, rgba(3,107,170,0.92) 0%, rgba(2,74,120,0.95) 100%)")
-            .set("backdrop-filter", "blur(16px)")
-            .set("-webkit-backdrop-filter", "blur(16px)")
-            .set("color", "white")
-            .set("flex-shrink", "0")
-            .set("border-right", "1px solid rgba(255,255,255,0.08)")
-            .set("box-shadow", "6px 0 30px rgba(15,23,35,0.28)");
-
-        H3 baslik = new H3("Talep Yönetim Sistemi");
-        baslik.getStyle().set("color", "white").set("margin-top", "0");
-
-        Span altBaslik = new Span("Scrum Master Paneli");
-        altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
-
-        HorizontalLayout bildirimSatir = new HorizontalLayout(
-            new Span("Bildirimler"),
-            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
-                reqId -> workflowService.findByRequestId(reqId).ifPresent(this::openGorevDetay)));
-        bildirimSatir.setAlignItems(Alignment.CENTER);
-        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
-
-        H5 menuBaslik = new H5("Menü");
-        menuBaslik.getStyle()
-            .set("color", "#aaaaaa")
-            .set("margin-bottom", "8px")
-            .set("margin-top", "24px");
-
-        Button sprintBtn      = menuButton("Sprint Board");
-        Button atanmamisBtn   = menuButton("Atanmamış Görevler");
-        Button tamamlananBtn  = menuButton("Tamamlanan Görevler");
-
-        sprintBtn.addClickListener(e -> showSprintBoard());
-        atanmamisBtn.addClickListener(e -> showAtanmamisGorevler());
-        tamamlananBtn.addClickListener(e -> showTamamlananlar());
-
-        Div divider = new Div();
-        divider.getStyle()
-            .set("border-top", "1px solid #444")
-            .set("margin-top", "auto")
-            .set("padding-top", "16px")
-            .set("width", "100%");
-
-        HorizontalLayout profilSatiri = com.example.dialog.ProfileDialog.sidebarProfileRow(
+        var bell = new com.example.notification.NotificationBell(
+            notificationService, notificationBroadcaster, currentUserId,
+            reqId -> workflowService.findByRequestId(reqId).ifPresent(this::openGorevDetay));
+        var profil = com.example.dialog.ProfileDialog.sidebarProfileRow(
             currentUserName, "Scrum Master",
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
-        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik, sprintBtn, atanmamisBtn, tamamlananBtn);
-        sidebar.addAndExpand(new Div());
-        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
-
-        return sidebar;
-    }
-
-    private Button menuButton(String text) {
-        Button btn = new Button(text);
-        btn.getStyle()
-            .set("color", "white")
-            .set("background", "rgba(255,255,255,0.07)")
-            .set("border", "none")
-            .set("border-left", "3px solid rgba(255,255,255,0.2)")
-            .set("border-radius", "6px")
-            .set("text-align", "left")
-            .set("width", "100%")
-            .set("cursor", "pointer")
-            .set("padding", "10px 14px")
-            .set("margin-bottom", "4px")
-            .set("font-size", "13px")
-            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
-        btn.getElement().addEventListener("mouseover", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid rgba(255,255,255,0.9)"));
-        btn.getElement().addEventListener("mouseout", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
-        return btn;
-    }
-
-    private Button buildLogoutButton() {
-        Button logoutBtn = new Button("Çıkış Yap",
-            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
-        logoutBtn.getStyle()
-            .set("background-color", "#c0392b")
-            .set("color", "white")
-            .set("width", "100%")
-            .set("margin-top", "12px")
-            .set("cursor", "pointer");
-        return logoutBtn;
+        return AppSidebar.build("Scrum Master Paneli", bell, List.of(
+            AppSidebar.menuButton("Sprint Board", this::showSprintBoard),
+            AppSidebar.menuButton("Atanmamış Görevler", this::showAtanmamisGorevler),
+            AppSidebar.menuButton("Tamamlanan Görevler", this::showTamamlananlar)
+        ), profil);
     }
 
     private VerticalLayout buildMainContent() {
@@ -194,7 +115,7 @@ public ScrumMasterView(WorkflowService workflowService,
         grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
         grid.addColumn(w -> talepTarihi(w.getRequestId())).setHeader("Tarih").setAutoWidth(true);
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
-        grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
+        grid.addComponentColumn(w -> com.example.dialog.DialogSupport.workflowBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
             boolean atanmamis = w.getDeveloperId() == null;
             Button ataBtn = new Button(
@@ -235,7 +156,7 @@ public ScrumMasterView(WorkflowService workflowService,
         grid.addColumn(w -> talepBasligi(w.getRequestId())).setHeader("Talep").setAutoWidth(true);
         grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
         grid.addColumn(w -> talepTarihi(w.getRequestId())).setHeader("Tarih").setAutoWidth(true);
-        grid.addComponentColumn(w -> durumBadge(w.getWorkflowStatus())).setHeader("Durum");
+        grid.addComponentColumn(w -> com.example.dialog.DialogSupport.workflowBadge(w.getWorkflowStatus())).setHeader("Durum");
         grid.addComponentColumn(w -> {
             Button ataBtn = new Button("Geliştirici Ata", e -> openAtama(w));
             ataBtn.getStyle().set("background-color", "#1B2A3B").set("color", "white");
@@ -262,7 +183,7 @@ public ScrumMasterView(WorkflowService workflowService,
         grid.addColumn(w -> sirketAdiByRequest(w.getRequestId())).setHeader("Şirket").setAutoWidth(true);
         grid.addColumn(w -> developerAdi(w.getDeveloperId())).setHeader("Geliştirici").setAutoWidth(true);
         grid.addColumn(w -> DateUtil.format(w.getUpdatedAt())).setHeader("Tamamlanma Tarihi");
-        grid.addComponentColumn(w -> durumBadge(WorkflowStatus.DONE)).setHeader("Durum");
+        grid.addComponentColumn(w -> com.example.dialog.DialogSupport.workflowBadge(WorkflowStatus.DONE)).setHeader("Durum");
         grid.setWidthFull();
 
         List<Workflow> tumGorevler = workflowService.getAllWorkflows();
@@ -288,7 +209,7 @@ public ScrumMasterView(WorkflowService workflowService,
         SmGorevDetayDialog.open(w, currentUserId,
             sirketAdiByRequest(w.getRequestId()),
             developerAdi(w.getDeveloperId()),
-            durumBadge(w.getWorkflowStatus()).getText(),
+            com.example.dialog.DialogSupport.workflowBadge(w.getWorkflowStatus()).getText(),
             this::showSprintBoard,
             requestService, requestMessageService, userService, activityLogService, workflowService);
     }
@@ -326,23 +247,5 @@ public ScrumMasterView(WorkflowService workflowService,
         return userService.findById(developerId)
             .map(User::getNameSurname)
             .orElse("Bilinmiyor");
-    }
-
-    private Span durumBadge(WorkflowStatus status) {
-        String label = switch (status) {
-            case BACKLOG     -> "Sırada";
-            case IN_PROGRESS -> "Devam Ediyor";
-            case TESTING     -> "Test Aşamasında";
-            case DONE        -> "Tamamlandı";
-        };
-        Span badge = new Span(label);
-        badge.getStyle().set("padding", "4px 8px").set("border-radius", "4px").set("font-size", "12px");
-        switch (status) {
-            case BACKLOG     -> badge.getStyle().set("background", "#fff3cd").set("color", "#856404");
-            case IN_PROGRESS -> badge.getStyle().set("background", "#d1ecf1").set("color", "#0c5460");
-            case TESTING     -> badge.getStyle().set("background", "#fff9c4").set("color", "#7d6608");
-            case DONE        -> badge.getStyle().set("background", "#d4edda").set("color", "#155724");
-        }
-        return badge;
     }
 }

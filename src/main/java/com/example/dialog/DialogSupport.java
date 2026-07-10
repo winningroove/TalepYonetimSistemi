@@ -31,7 +31,7 @@ public final class DialogSupport {
     /** İş akışı durumunu renkli bir rozet (badge) olarak döndürür. */
     public static Span workflowBadge(WorkflowStatus status) {
         String label = switch (status) {
-            case BACKLOG     -> "Backlog";
+            case BACKLOG     -> "Sırada";
             case IN_PROGRESS -> "Devam Ediyor";
             case TESTING     -> "Test Aşamasında";
             case DONE        -> "✓ Tamamlandı";

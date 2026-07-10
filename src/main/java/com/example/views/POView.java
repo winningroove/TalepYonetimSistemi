@@ -14,6 +14,7 @@ import com.example.request.RequestFileService;
 import com.example.request.RequestService;
 import com.example.user.User;
 import com.example.user.UserService;
+import com.example.util.AppSidebar;
 import com.example.util.DateUtil;
 import com.example.util.Brand;
 import com.example.util.Charts;
@@ -99,103 +100,22 @@ public class POView extends HorizontalLayout {
     }
 
     private VerticalLayout buildSidebar() {
-        VerticalLayout sidebar = new VerticalLayout();
-        sidebar.setWidth("260px");
-        sidebar.setHeightFull();
-        sidebar.setPadding(true);
-        sidebar.setSpacing(false);
-        sidebar.getStyle()
-            .set("background-image",
-                "linear-gradient(180deg, rgba(3,107,170,0.92) 0%, rgba(2,74,120,0.95) 100%)")
-            .set("backdrop-filter", "blur(16px)")
-            .set("-webkit-backdrop-filter", "blur(16px)")
-            .set("color", "white")
-            .set("flex-shrink", "0")
-            .set("border-right", "1px solid rgba(255,255,255,0.08)")
-            .set("box-shadow", "6px 0 30px rgba(15,23,35,0.28)");
-
-        H3 baslik = new H3("Talep Yönetim Sistemi");
-        baslik.getStyle().set("color", "white").set("margin-top", "0");
-
-        Span altBaslik = new Span("Ürün Sorumlusu Yönetim Paneli");
-        altBaslik.getStyle().set("color", "#aaaaaa").set("font-size", "12px");
-
-        HorizontalLayout bildirimSatir = new HorizontalLayout(
-            new Span("Bildirimler"),
-            new com.example.notification.NotificationBell(notificationService, notificationBroadcaster, currentUserId,
-                this::talepVurgula));
-        bildirimSatir.setAlignItems(Alignment.CENTER);
-        bildirimSatir.getStyle().set("color", "#aaaaaa").set("font-size", "12px").set("margin-top", "12px");
-
-        H5 menuBaslik = new H5("Menü");
-        menuBaslik.getStyle()
-            .set("color", "#aaaaaa")
-            .set("margin-bottom", "8px")
-            .set("margin-top", "24px");
-
-        Button gostergeBtn      = menuButton("Gösterge Paneli");
-        gelenTaleplerBtn        = menuButton("Gelen Talepler");
-        Button oncelikHavuzuBtn = menuButton("Talep Sıralaması");
-        Button isAkislariBtn    = menuButton("İş Akışları (Sprint)");
-
-        gostergeBtn.addClickListener(e -> showGostergePaneli());
-        gelenTaleplerBtn.addClickListener(e -> showGelenTalepler());
-        oncelikHavuzuBtn.addClickListener(e -> showOnceliklendirmeHavuzu());
-        isAkislariBtn.addClickListener(e -> showIsAkislari());
-
-        Div divider = new Div();
-        divider.getStyle()
-            .set("border-top", "1px solid #444")
-            .set("margin-top", "auto")
-            .set("padding-top", "16px")
-            .set("width", "100%");
-
-        HorizontalLayout profilSatiri = com.example.dialog.ProfileDialog.sidebarProfileRow(
+        var bell = new com.example.notification.NotificationBell(
+            notificationService, notificationBroadcaster, currentUserId, this::talepVurgula);
+        var profil = com.example.dialog.ProfileDialog.sidebarProfileRow(
             currentUserName, "Ürün Sorumlusu",
             () -> userService.findById(currentUserId).ifPresent(u ->
                 com.example.dialog.ProfileDialog.open(u, companyService, activityLogService, requestService, userService)));
 
-        sidebar.add(Brand.sidebarLogo(), baslik, altBaslik, bildirimSatir, menuBaslik,
-            gostergeBtn, gelenTaleplerBtn, oncelikHavuzuBtn, isAkislariBtn);
+        gelenTaleplerBtn = AppSidebar.menuButton("Gelen Talepler", this::showGelenTalepler);
+        VerticalLayout sidebar = AppSidebar.build("Ürün Sorumlusu Yönetim Paneli", bell, List.of(
+            AppSidebar.menuButton("Gösterge Paneli", this::showGostergePaneli),
+            gelenTaleplerBtn,
+            AppSidebar.menuButton("Talep Sıralaması", this::showOnceliklendirmeHavuzu),
+            AppSidebar.menuButton("İş Akışları (Sprint)", this::showIsAkislari)
+        ), profil);
         guncelleGelenTalepButonu();
-        sidebar.addAndExpand(new Div());
-        sidebar.add(divider, profilSatiri, new com.example.util.ThemeToggle(), buildLogoutButton());
-
         return sidebar;
-    }
-
-    private Button menuButton(String text) {
-        Button btn = new Button(text);
-        btn.getStyle()
-            .set("color", "white")
-            .set("background", "rgba(255,255,255,0.07)")
-            .set("border", "none")
-            .set("border-left", "3px solid rgba(255,255,255,0.2)")
-            .set("border-radius", "6px")
-            .set("text-align", "left")
-            .set("width", "100%")
-            .set("cursor", "pointer")
-            .set("padding", "10px 14px")
-            .set("margin-bottom", "4px")
-            .set("font-size", "13px")
-            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.25)");
-        btn.getElement().addEventListener("mouseover", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.15)").set("border-left", "3px solid rgba(255,255,255,0.9)"));
-        btn.getElement().addEventListener("mouseout", e ->
-            btn.getStyle().set("background", "rgba(255,255,255,0.07)").set("border-left", "3px solid rgba(255,255,255,0.2)"));
-        return btn;
-    }
-
-    private Button buildLogoutButton() {
-        Button logoutBtn = new Button("Çıkış Yap",
-            e -> com.vaadin.flow.component.UI.getCurrent().getPage().setLocation("/logout"));
-        logoutBtn.getStyle()
-            .set("background-color", "#c0392b")
-            .set("color", "white")
-            .set("width", "100%")
-            .set("margin-top", "12px")
-            .set("cursor", "pointer");
-        return logoutBtn;
     }
 
     private VerticalLayout buildMainContent() {
